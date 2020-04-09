@@ -6,6 +6,10 @@ __default__:
     ntasks: 1
     output: logs/cluster/{rule}.%A.out
 
+getAlleleCountsByChr:
+    time:   "5:0:0"
+    mem:    4G
+    
 read_counter:
     time:   "5:0:0"
     mem:    4G
@@ -18,4 +22,14 @@ runTitanCNA:
     time:   "100:0:0"
     mem:    16G
     ncpus:  1
-    
+
+combineTitanAndIchorCNA:
+    time:   "5:0:0"
+    mem:    16G
+    ncpus:  1   
+
+runSvaba:
+    time: "100:0:0"
+    mem:    12G #total memory (i.e. 3Gb per core)
+    ncpus:  4
+    ntasks: 1
