@@ -120,6 +120,5 @@ plot_size:  c(8,4)
 plot_type:  titan ## titan - will include haplotype fraction
 plot_format:  png
 plot_ichor_units: logratio
-plot_titan_units: integer
 
 
