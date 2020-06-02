@@ -109,6 +109,38 @@ setVCFgenomeStyle <- function(x, genomeStyle = "NCBI"){
 	return(x)
 } 
 
+###############################################
+##### convert to bedpe from vcf file path #####
+###############################################
+convertVCF2bedpe <- function(vcfFile, genomeBuild = "hg38", genomeStyle = "UCSC"){
+  vcf <- tryCatch({
+      message("loading vcf ", vcfFile)
+      readVcf(svFiles[i], genome = genomeBuild)
+    }, error = function(x){ 
+      return(NA) 
+  })
+
+  if (!is.na(vcf)){
+    sv <- getSVfromCollapsedVCF(vcf, genomeStyle = genomeStyle)
+    sv <- cbind(Sample=id, sv)
+
+    #sv.out <- svAll[, .(Sample, SV.combined.id, chromosome_1, start_1, orient_1, chromosome_2, start_2, orient_2)]
+    sv.out <- copy(sv)
+    sv.out[, c("chrom1", "start1", "end1", "chrom2", "start2", "end2") := .(chromosome_1, start_1, start_1, chromosome_2, start_2, start_2)]
+    sv.out[, strand1 := { strand = rep("+", .N); strand[orient_1=="fwd"] = "-"; strand }]
+    sv.out[, strand2 := { strand = rep("+", .N); strand[orient_2=="fwd"] = "-"; strand }]
+    #setnames(sv.out, c("chromosome_1", "start_1", "chromosome_2", "start_2"), 
+    # c("chrom1", "start1", "chrom2", "start2"))
+    sv.out[, name := "."]; sv.out[, score := "."]
+    colNameOrder <- c("chrom1", "start1", "end1", "chrom2", "start2", "end2", "name", "score", "strand1", "strand2")
+    setcolorder(sv.out, c(colNameOrder, colnames(sv.out)[!colnames(sv.out) %in% colNameOrder]))
+  }else{
+    return(NULL)
+  }
+
+  return(sv.out)
+}
+
 ##########################################
 ##### remove duplicate breakpoints #######
 ##########################################
@@ -425,30 +457,6 @@ annotVCFbyOverlap <- function(sv1, sv2, annotCol, buffer = 0){
   ind <- ind[duplicated(ind), ]
   #sv[ind$queryHits, eval(annotCol) := sv2[ind$subjectHits, get(annotCol)]]
   return(list(ind = ind$queryHits, values = sv2[ind$subjectHits, get(annotCol)]))
-}
-
-#########################################
-## fit BXOL by length from SNOWMAN SV ###
-#########################################
-computeBXOLbinomialTest <- function(svSample, minBXOL=3, minSPAN=10000, minSPANBX=10000,
-      se.level=0.95, loess.span=0.1, filter.quantile=0.95){
-  bxol.fit.intraChr <- fitBXOLbyLength(svSample, interchr = FALSE, minBXOL = minBXOL, 
-      minLength = minSPAN, minBXLength = minSPANBX, se.level = se.level, loess.span = loess.span, 
-      filter.quantile = filter.quantile)
-  bxol.fit.interChr <- fitBXOLbyLength(svSample, interchr = TRUE, minBXOL = minBXOL, 
-      se.level = se.level, loess.span = loess.span, filter.quantile = filter.quantile)
-  sv <- bxol.fit.intraChr$sv
-  # interchr - use median BX.frac.min of SVABA interchr events #
-  sv[SPAN == -1, fit.estimate := bxol.fit.interChr$sv[SPAN==-1 & support=="SVABA" & BXOL >= minBXOL, max(median(BX.frac.min), 0)]]
-  sv[SPAN == -1, fit.estimate.se.low := fit.estimate]
-  
-  ## compute p-value for each breakpoint in the pair ##
-  # use binomial exact test #
-  sv[support=="BX" & !is.na(BXOL) & BXOL >= minBXOL & !is.na(fit.estimate), 
-    BXOL.pval.1 := pbinom(q=BXOL-1, size=BXC.1, prob=fit.estimate, lower.tail=FALSE)]
-  sv[support=="BX" & !is.na(BXOL) & BXOL >= minBXOL & !is.na(fit.estimate), 
-    BXOL.pval.2 := pbinom(q=BXOL-1, size=BXC.2, prob=fit.estimate, lower.tail=FALSE)]
-  return(list(sv=copy(sv), gp=bxol.fit.intraChr$gp))
 }
 
 ###########################################
