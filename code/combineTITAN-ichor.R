@@ -61,28 +61,6 @@ ichorCNmap <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP", rep("HLAMP", 1000))
 #ichorCNmap <- list("0"="HOMD", "1"="DLOH", "2"="NEUT", "3"="GAIN", "4"="AMP", "5"="AMP")
 maxichorcn <- 5
 
-## get chromosome style
-titan$Chromosome <- as.character(titan$Chromosome)
-titan.cn$Chr <- as.character(titan.cn$Chr)
-genomeStyle <- seqlevelsStyle(titan.cn$Chr)[1]
-chrs <- c(1:22, "X")
-chrXStr <- grep("X", chrs, value=TRUE)
-seqlevelsStyle(chrs) <- genomeStyle
-
-## load parameters ##
-params <- read.delim(titanParams, header=F, as.is=T)
-purity <- 1 - as.numeric(params[1,2])
-ploidyT <- as.numeric(params[2,2])
-ploidy <- purity * ploidyT + (1-purity) * 2
-params.ichor <- read.delim(ichorParams, header=T, as.is=T)
-homd.var <- as.numeric(strsplit(params[params[,1]=="logRatio Gaussian variance:",2], " ")[[1]][1])
-homd.sd <- sqrt(homd.var)
-
-## get gender
-if (is.null(gender) || gender == "None"){
-	gender <- params.ichor[3, 2]
-}
-
 ## load segments 
 titan <- fread(titanSeg)
 if (length(titan[["Cellular_Frequency"]] == 0)){
@@ -105,6 +83,28 @@ ichor.cn[, Position := start]
 setnames(ichor.cn, c("chr", "start", paste0(id,".copy.number"), paste0(id,".event"), paste0(id,".logR"), "end"), 
 		c("Chr", "Start", "CopyNumber", "TITANcall", "LogRatio", "End"))
 
+## get chromosome style
+titan$Chromosome <- as.character(titan$Chromosome)
+titan.cn$Chr <- as.character(titan.cn$Chr)
+genomeStyle <- seqlevelsStyle(titan.cn$Chr)[1]
+chrs <- c(1:22, "X")
+chrXStr <- grep("X", chrs, value=TRUE)
+seqlevelsStyle(chrs) <- genomeStyle
+
+## load parameters ##
+params <- read.delim(titanParams, header=F, as.is=T)
+purity <- 1 - as.numeric(params[1,2])
+ploidyT <- as.numeric(params[2,2])
+ploidy <- purity * ploidyT + (1-purity) * 2
+params.ichor <- read.delim(ichorParams, header=T, as.is=T)
+homd.var <- as.numeric(strsplit(params[params[,1]=="logRatio Gaussian variance:",2], " ")[[1]][1])
+homd.sd <- sqrt(homd.var)
+
+## get gender
+if (is.null(gender) || gender == "None"){
+	gender <- params.ichor[3, 2]
+}
+
 ## get bin overlap with SNPs - include ichor bins even if no SNPs overlap 
 titan.gr <- titan.cn[, .(Chr, Position)]
 titan.gr[, Start := Position]; titan.gr[, End := Position]
@@ -124,39 +124,40 @@ ichor.segs[, Corrected_Copy_Number := as.integer(round(logR_Copy_Number))]
 ichor.segs[, Corrected_Call := ichorCNmap[Corrected_Copy_Number + 1]]
 ichor.segs[, Corrected_logR := log2(logR_Copy_Number / ploidy)]
 ichor.segs.homd.ind <- ichor.segs[Chromosome != chrXStr & Corrected_Copy_Number == 0 & Median_logR < homdLogRThres.auto, which = TRUE]
-titan.gr <- copy(titan)
-titan.gr[, Start := Start_Position.bp.]; titan.gr[, End := End_Position.bp.]
-titan.gr <- as(titan.gr, "GRanges")
-ichor.segs.gr <- copy(ichor.segs)
-ichor.segs.gr[, Start := Start_Position.bp.]; ichor.segs.gr[, End := End_Position.bp.]
-ichor.homd.gr <- as(ichor.segs.gr[ichor.segs.homd.ind], "GRanges")
-#hits <- findOverlaps(query = titan.gr, subject = ichor.homd.gr)
-titan.gr.combinedHomd <- sort(c(titan.gr, ichor.homd.gr))
-titan.combinedHomd <- as.data.table(disjoin(titan.gr.combinedHomd, with.revmap = TRUE))
-mcolData <- data.table()
-for (i in 1:nrow(titan.combinedHomd)){
-	ind <- titan.combinedHomd[i, revmap][[1]]
-	if (length(ind) == 1){
-		mcolData <- rbind(mcolData, mcols(titan.gr.combinedHomd)[ind, c(4:19,21)])
-	}else{ # ind has more than one mapping index
-		ind.homd.gr <- ind[which(titan.gr.combinedHomd[ind]$Corrected_Copy_Number == 0)]
-		mcolData <- rbind(mcolData, mcols(titan.gr.combinedHomd)[ind.homd.gr, c(4:19,21)])
+if (length(ichor.segs.homd.ind)){
+	titan.gr <- copy(titan)
+	titan.gr[, Start := Start_Position.bp.]; titan.gr[, End := End_Position.bp.]
+	titan.gr <- as(titan.gr, "GRanges")
+	ichor.segs.gr <- copy(ichor.segs)
+	ichor.segs.gr[, Start := Start_Position.bp.]; ichor.segs.gr[, End := End_Position.bp.]
+	ichor.homd.gr <- as(ichor.segs.gr[ichor.segs.homd.ind], "GRanges")
+	#hits <- findOverlaps(query = titan.gr, subject = ichor.homd.gr)
+	titan.gr.combinedHomd <- sort(c(titan.gr, ichor.homd.gr))
+	titan.combinedHomd <- as.data.table(disjoin(titan.gr.combinedHomd, with.revmap = TRUE))
+	mcolData <- data.table()
+	for (i in 1:nrow(titan.combinedHomd)){
+		ind <- titan.combinedHomd[i, revmap][[1]]
+		if (length(ind) == 1){
+			mcolData <- rbind(mcolData, mcols(titan.gr.combinedHomd)[ind, c(4:19,21)])
+		}else{ # ind has more than one mapping index
+			ind.homd.gr <- ind[which(titan.gr.combinedHomd[ind]$Corrected_Copy_Number == 0)]
+			mcolData <- rbind(mcolData, mcols(titan.gr.combinedHomd)[ind.homd.gr, c(4:19,21)])
+		}
 	}
+	titan.combinedHomd <- cbind(titan.combinedHomd, as.data.table(mcolData))
+	titan <- cbind(Sample = id, titan.combinedHomd[, -c(4:6)])
+	setnames(titan, c("seqnames", "start", "end"), c("Chromosome", "Start_Position.bp.", "End_Position.bp."))
 }
-titan.combinedHomd <- cbind(titan.combinedHomd, as.data.table(mcolData))
-titan.combinedHomd <- cbind(Sample = id, titan.combinedHomd[, -c(4:6)])
-setnames(titan.combinedHomd, c("seqnames", "start", "end"), c("Chromosome", "Start_Position.bp.", "End_Position.bp."))
-
 
 ## combine TITAN (chr1-22) and ichorCNA (chrX) segments and bin/SNP level data ##
 ## if male only ##
 if (gender == "male"){
 	cn <- rbind(titan.ichor.cn[Chr %in% chrs[1:22]], ichor.cn[Chr == chrs[grep("X", chrs)]], fill = TRUE)
-	segs <- rbind(titan.combinedHomd[Chromosome %in% chrs[1:22]], ichor.segs[Chromosome == chrs[grep("X", chrs)]], fill = TRUE)
+	segs <- rbind(titan[Chromosome %in% chrs[1:22]], ichor.segs[Chromosome == chrs[grep("X", chrs)]], fill = TRUE)
 	segs[, subclone.status := NULL]
 }else{
 	cn <- titan.ichor.cn
-	segs <- titan.combinedHomd
+	segs <- titan
 }
 
 ## sort column order
