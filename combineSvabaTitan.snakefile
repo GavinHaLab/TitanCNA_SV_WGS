@@ -25,7 +25,7 @@ rule all:
   	#expand(directory("results/plotSVABAandTITAN/{tumor}"), tumor=config["pairings"])
    	expand("results/plotSVABAandTITAN/{tumor}/{tumor}_CNA-SV-BX_{type}_chr{chr}.{format}", tumor=config["pairings"], type=config["plot_type"], chr=CHRS, format=config["plot_format"]),
   	expand("results/plotSVABAandICHOR/{tumor}/{tumor}_CNA-SV-BX_{type}_chr{chr}.{format}", tumor=config["pairings"], type=config["plot_type"], chr=CHRS, format=config["plot_format"]),
-  	expand("results/plotCircos/{tumor}/{tumor}_Circos.pdf", tumor=config["pairings"])
+  	expand("results/plotCircos/{tumor}_Circos.pdf", tumor=config["pairings"])
 
 rule combineSVABAandTITAN:
 	input:
