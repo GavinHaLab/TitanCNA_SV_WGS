@@ -62,8 +62,8 @@ getSVfromCollapsedVCF <- function(vcf, chrs = c(1:22, "X"), genomeStyle = "NCBI"
       
       ## filter by chromosome ##
       		seqlevelsStyle(chrs) <- genomeStyle
-      		sv$chromosome_1 <- mapSeqlevels(sv$chromosome_1, style = genomeStyle)
-      		sv$chromosome_2 <- mapSeqlevels(sv$chromosome_2, style = genomeStyle)
+      		sv$chromosome_1 <- mapSeqlevels(sv$chromosome_1, style = genomeStyle, drop = FALSE)[1, ]
+      		sv$chromosome_2 <- mapSeqlevels(sv$chromosome_2, style = genomeStyle, drop = FALSE)[1, ]
       		ind <- sv$chromosome_1 %in% chrs & sv$chromosome_2 %in% chrs
 			sv <- sv[ind,]
       

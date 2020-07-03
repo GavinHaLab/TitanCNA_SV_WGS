@@ -181,6 +181,7 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
         ylab <- "Copy Number"
         #dataByChr[, colName] <- log2(logRbasedCN(dataByChr[, colName], purity, ploidyT, cn=normCN))
         dataByChr[, colName] <- log2(dataByChr[, colName])
+        dataByChr[dataByChr[[colName]] < -1 , colName] <- -1
         if (!is.null(segs)){
       		segs[, colName] <- log2(segs[, colName])# + log2(ploidyS / 2)
     		}

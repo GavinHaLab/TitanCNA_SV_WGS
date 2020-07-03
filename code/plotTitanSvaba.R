@@ -96,12 +96,13 @@ if (!require(bsg, character.only=TRUE, quietly=TRUE, warn.conflicts=FALSE)) {
 } else {
 	seqinfo <- seqinfo(get(bsg))
 }
+seqlevelsStyle(seqinfo) <- genomeStyle
 
 if (zoom){
   xlim <- c(startPos, endPos)
    startTitle <- paste0(format(round(startPos/1e6,2), nsmall=2))
   endTitle <- paste0(format(round(endPos/1e6,2),nsmall=2), "Mb")
-  cex <- 0.5
+  cex <- 1
   cytoBand <- F
   xaxt <- "s"
   plotAtCentre <- FALSE
@@ -121,7 +122,7 @@ if (zoom){
 if (chrStr == "0" || is.null(chrStr) || chrStr == "None"){
   chrStr <- as.character(c(1:22, "X"))
 }
-seqlevelsStyle(chrStr) <- genomeStyle
+seqlevelsStyle(chrStr)[1] <- genomeStyle
 if (plotType == "titan"){
 	cnColor <- TRUE
 	plotAllelicFrac <- TRUE
@@ -151,7 +152,7 @@ if (!is.null(geneList) && geneList != "None"){
   genes <- NULL
 }
 colnames(genes) <- c("Gene", "Chr", "Start", "End")
-seqlevelsStyle(genes$Chr) <- genomeStyle
+seqlevelsStyle(genes$Chr)[1] <- genomeStyle
 
 if (genomeBuild == "hg38" && file.exists(cytobandFile)){
   cytoband <- as.data.frame(fread(cytobandFile))
@@ -189,10 +190,11 @@ if (plotType == "titan"){
 ulp <- ulp[Chr %in% chrStr]
 ulp$Chr <- factor(ulp$Chr, levels = chrStr)
 ulp <- ulp[order(Chr, Start)]
+ulp <- ulp[!is.na(get(colName))]
 
 ############# load Combined SV (SVABA, GROC, LongRanger) ##############
 sv <- fread(svFile)
-save.image(file=outImage)
+#save.image(file=outImage)
 
 #####################################
 ########## PLOT CHR RESULTS #########
@@ -226,7 +228,7 @@ for (j in 1:length(chrStr)){
 	}
   if (plotAllelicFrac){ par(mfrow=c(2,1)); spacing <- 0  }
 	
-  if (plotSegs) { segsToPlot <- segs } else { segsToPlot <- NULL}
+  if (plotSegs) { segsToPlot <- as.data.frame(segs) } else { segsToPlot <- NULL}
   
   if (grepl("X", chrStr[j])) { cnCol <- rep("#000000", 30) }
   message("Plotting read depth CN")
@@ -277,14 +279,14 @@ for (j in 1:length(chrStr)){
   if (plotAllelicFrac){
     message("Plotting allelic fraction")
     plotAllelicRatio(dataIn=ulp[,-1], chr=chrStr[j], geneAnnot=NULL,  xlab="", ylim=c(0,1), 
-    	xlim=xlim, cex=0.25, cex.axis=1.5, cex.lab=1.5, spacing = 6)
+    	xlim=xlim, cex=cex, cex.axis=1.5, cex.lab=1.5, spacing = 6)
 	  par(xpd=NA)
     
     if (genomeBuild == "hg38" && file.exists(cytobandFile)){
       sl <- seqlengths(seqinfo[chrStr[j]])
-      pI <- plotIdiogram.hg38(chrStr[j], cytoband=cytoband, seqinfo=seqinfo, xlim=c(0, max(sl)), unit="bp", label.y=-0.35, new=FALSE, ylim=c(-0.3,-0.15))	
+      pI <- plotIdiogram.hg38(chrStr[j], cytoband=cytoband, seqinfo=seqinfo, xlim=c(0, max(sl)), unit="bp", label.y=-0.425, new=FALSE, ylim=c(-0.3,-0.15))	
     }else{
-      pI <- plotIdiogram(chrStr[j], build="hg19", unit="bp", label.y=-0.6, new=FALSE, ylim=c(-0.3,-0.15))
+      pI <- plotIdiogram(chrStr[j], build="hg19", unit="bp", label.y=-0.4, new=FALSE, ylim=c(-0.3,-0.15))
     }
   }else{ # not plotting allelic fraction
     if (!zoom){
