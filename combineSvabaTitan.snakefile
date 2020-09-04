@@ -119,10 +119,11 @@ rule plotCircos:
 		"results/plotCircos/{tumor}_Circos.pdf"
 	params:
 		plotCIRCOSscript=config["plotCircos_script"],
-		genomeBuild=config["genomeBuild"]
+		genomeBuild=config["genomeBuild"],
+		genomeStyle=config["genomeStyle"]
 	log:
 		"logs/plotCircos/{tumor}_Circos.log"
 	shell:
-		"Rscript {params.plotCIRCOSscript} --id {wildcards.tumor} --svFile {input.svabaTitanBedpe} --cnFile {input.svabaTitanCN} --genomeBuild {params.genomeBuild} --outPlotFile {output} > {log} 2> {log}"
+		"Rscript {params.plotCIRCOSscript} --id {wildcards.tumor} --svFile {input.svabaTitanBedpe} --cnFile {input.svabaTitanCN} --genomeBuild {params.genomeBuild} --genomeStyle {params.genomeStyle} --outPlotFile {output} > {log} 2> {log}"
 
 
