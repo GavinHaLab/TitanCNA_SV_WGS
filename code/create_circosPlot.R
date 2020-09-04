@@ -8,6 +8,9 @@
 library(RCircos)
 library(data.table)
 library(optparse)
+library(GenomeInfoDb)
+
+options(stringsAsFactors=FALSE)
 
 option_list <- list(
   make_option(c("--id"), type = "character", help = "Sample ID"),
@@ -41,7 +44,12 @@ if(genomeBuild =="hg38"){
 	data(UCSC.HG19.Human.CytoBandIdeogram)
 	cyto.info <- UCSC.HG19.Human.CytoBandIdeogram
 }
+
 cyto.info <- as.data.table(cyto.info)
+
+chrs <- as.character(cyto.info$Chromosome)
+seqlevelsStyle(chrs) <- genomeStyle
+cyto.info$Chromosome <- chrs
 
 #Setup RCircos core components
 RCircos.Set.Core.Components(cyto.info, tracks.inside=10, tracks.outside=0) 
@@ -56,7 +64,7 @@ if (!is.null(excludeTools)){
 }
 # check LongRanger coordinates within cyto.info
 # if coord is larger than cyto.info, then set it to the largest in cyto.info
-chrEnds <- cyto.info[, max(chromEnd), by = Chromosome]
+chrEnds <- cyto.info[, max(ChromEnd), by = Chromosome]
 for (i in sv.data[, unique(chrom1)]){
 	chrEndCoord <- chrEnds[Chromosome == i, V1]
 	sv.data[chrom1 == i & start1 > chrEndCoord, start1 := chrEndCoord]
