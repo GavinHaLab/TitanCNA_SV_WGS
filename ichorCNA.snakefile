@@ -45,6 +45,7 @@ rule ichorCNA:
 		ploidy=config["ichorCNA_ploidy"],
 		normal=config["ichorCNA_normal"],
 		sex=config["sex"],
+		genomeBuild=config["genomeBuild"],
 		genomeStyle=config["genomeStyle"],
 		gcwig=config["ichorCNA_gcWig"],
 		mapwig=config["ichorCNA_mapWig"],
@@ -57,11 +58,17 @@ rule ichorCNA:
 		includeHOMD=config["ichorCNA_includeHOMD"],
 		chrs=config["ichorCNA_chrs"],
 		#chrTrain=config["ichorCNA_chrTrain"],
+		likModel=config["ichorCNA_likModel"],
 		centromere=config["centromere"],
 		exons=config["ichorCNA_exons"],
 		txnE=config["ichorCNA_txnE"],
 		txnStrength=config["ichorCNA_txnStrength"],
 		fracReadsChrYMale="0.001",
+		minMapScore=config["ichorCNA_minMapScore"],
+		maxFracGenomeSubclone=config["ichorCNA_maxFracGenomeSubclone"],
+		maxFracCNASubclone=config["ichorCNA_maxFracCNASubclone"],
+		normal2IgnoreSC=config["ichorCNA_normal2IgnoreSC"],
+		scPenalty=config["ichorCNA_scPenalty"],
 		plotFileType=config["ichorCNA_plotFileType"],
 		plotYlim=config["ichorCNA_plotYlim"]
 	resources:
@@ -69,4 +76,4 @@ rule ichorCNA:
 	log:
 		"logs/ichorCNA/{tumor}.log"	
 	shell:
-		"Rscript {params.rscript} --libdir {params.libdir} --id {params.id} --WIG {input.tum} --repTimeWig {params.repTimeWig} --sex {params.sex} --gcWig {params.gcwig} --mapWig {params.mapwig} --NORMWIG {input.norm} --ploidy \"{params.ploidy}\" --normal \"{params.normal}\" --maxCN {params.maxCN} --includeHOMD {params.includeHOMD} --genomeStyle {params.genomeStyle} --chrs \"{params.chrs}\" --estimateNormal {params.estimateNormal} --estimatePloidy {params.estimatePloidy} --estimateScPrevalence {params.estimateClonality} --scStates \"{params.scStates}\" --centromere {params.centromere} --exons.bed {params.exons} --txnE {params.txnE} --txnStrength {params.txnStrength} --fracReadsInChrYForMale {params.fracReadsChrYMale} --plotFileType {params.plotFileType} --plotYLim \"{params.plotYlim}\" --outDir {params.outDir} > {log} 2> {log}"
+		"Rscript {params.rscript} --libdir {params.libdir} --id {params.id} --WIG {input.tum} --repTimeWig {params.repTimeWig} --sex {params.sex} --gcWig {params.gcwig} --mapWig {params.mapwig} --NORMWIG {input.norm} --ploidy \"{params.ploidy}\" --normal \"{params.normal}\" --maxCN {params.maxCN} --includeHOMD {params.includeHOMD} --genomeStyle {params.genomeStyle} --genomeBuild {params.genomeBuild} --chrs \"{params.chrs}\" --estimateNormal {params.estimateNormal} --estimatePloidy {params.estimatePloidy} --estimateScPrevalence {params.estimateClonality} --scStates \"{params.scStates}\" --likModel {params.likModel} --minMapScore {params.minMapScore} --maxFracGenomeSubclone {params.maxFracGenomeSubclone} --maxFracCNASubclone {params.maxFracCNASubclone} --normal2IgnoreSC {params.normal2IgnoreSC} --scPenalty {params.scPenalty} --centromere {params.centromere} --exons.bed {params.exons} --txnE {params.txnE} --txnStrength {params.txnStrength} --fracReadsInChrYForMale {params.fracReadsChrYMale} --plotFileType {params.plotFileType} --plotYLim \"{params.plotYlim}\" --outDir {params.outDir} > {log} 2> {log}"
