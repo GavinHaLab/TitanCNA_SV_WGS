@@ -135,7 +135,7 @@ save.image(outImage)
 
 
 ## combine to save data.table ##
-svaba[, type := getSVType(svaba, minColSPAN = minSPAN, minTrans = minTrans)]#, maxInvSPAN = maxInvSPAN, maxFBISPAN = maxFBISPAN)]
+svaba[, type := getSVType(svaba, minColSPAN = 0, minTrans = minTrans)]#, maxInvSPAN = maxInvSPAN, maxFBISPAN = maxFBISPAN)]
 
 ## output to files ##
 outFile <- paste0(outDir, "/", tumId, "_svaba.txt")
@@ -161,7 +161,7 @@ cn <- fread(cnFile)
 cn <- unique(cn[, .(Sample, Chr, Start, End, LogRatio, logR_Copy_Number, Corrected_Copy_Number, Corrected_Call)])
 cn <- cn[!is.na(Start) & !is.na(End)]
 cn <- cbind(CN.id = 1:nrow(cn), cn)	
-sv[, Ploidy.medianCN := median(cn$Corrected_Copy_Number)]
+sv[, Ploidy.medianCN := median(cn$Corrected_Copy_Number, na.rm = TRUE)]
 ## annotate bin CN to prev/next of both breakpoints
 cn[, Corrected_Copy_Number := round(logR_Copy_Number)]
 cn[, Corrected_Copy_Number_prev := c(NA, Corrected_Copy_Number[-.N]), by = Chr]
@@ -180,7 +180,7 @@ annot <- annotateSVbetweenBkptsWithCN(sv, cn, segs, buffer = seg.buffer,
 sv[annot$ind, Copy_Number_1_2_mean := round(annot$annot.cn$cn)]
 sv[annot$ind, Copy_Number_1_2_numSegs := annot$annot.seg$NumSeg]
 
-sv[, type := getSVType(sv, minColSPAN = minSPAN, minTrans = minTrans)]
+#sv[, type := getSVType(sv, minColSPAN = minSPAN, minTrans = minTrans)]
 save.image(outImage)
 
 ########################################################################
@@ -357,7 +357,7 @@ sv[is.na(CN_overlap_type) & !is.na(type) & SPAN >= minInvSPAN, CN_overlap_type :
 ## filter short inversions and deletions (longranger & svaba) ##
 ########################################################################
 #sv <- sv[!is.na(CN_overlap_type) | !is.na(overlap.GROCSVS.id)]
-sv <- sv[!is.na(CN_overlap_type)]
+#sv <- sv[!is.na(CN_overlap_type)]
 
 ########################################################################
 ## inverted duplications (templated insertions?) ##
