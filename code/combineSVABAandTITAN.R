@@ -186,11 +186,11 @@ save.image(outImage)
 ########################################################################
 ######################### SV CLASSIFICATIONS ###########################
 ########################################################################
-if (segs[!grepl("X", Chromosome), median(Corrected_Copy_Number, na.rm=T)] == 2 || 
-		segs[!grepl("X", Chromosome), median(Corrected_Copy_Number, na.rm=T)] == 3){
+if (segs[!grepl("X", Chromosome), round(median(Corrected_Copy_Number, na.rm=T))] == 2 || 
+		segs[!grepl("X", Chromosome), round(median(Corrected_Copy_Number, na.rm=T))] == 3){
 	del.cn <- c("HOMD", "DLOH", "NLOH", "ALOH")
 	neut.cn <- c("NEUT", "HET")
-}else if (segs[!grepl("X", Chromosome), median(Corrected_Copy_Number, na.rm=T)] >= 4){
+}else if (segs[!grepl("X", Chromosome), round(median(Corrected_Copy_Number, na.rm=T))] >= 4){
 	del.cn <- c("HOMD", "DLOH", "NLOH", "ALOH", "GAIN")
 	neut.cn <- c("NEUT", "HET", "BCNA")
 }
