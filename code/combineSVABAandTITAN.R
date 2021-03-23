@@ -222,10 +222,6 @@ interchrUBal.cn.sv <- sv[type == "InterChr" &
 interchrUBal.sv.id <- sort(interchrUBal.cn.sv$SV.id)
 sv[SV.id %in% interchrUBal.sv.id, CN_overlap_type := "Trans-Unbal"]
 
-# exclude BX rescue for interchr if not seen by another tool
-sv[type == "InterChr" & !SV.id %in% consensus.sv.id & (support == "BX"), CN_overlap_type := NA] 
-
-
 ########################################################################
 ## simple deletions ##
 ########################################################################
