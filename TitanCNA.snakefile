@@ -1,15 +1,11 @@
 """
-#must first check to make sure exon bed file is compatible with this code in
-#code/runIchorCNA.R (check that there is a header; might need to change 'skip'):
-#targetedSequences <- read.delim(exons.bed, header=T, sep="\t", skip=0)
-
 #before running snakemake, do in tmux terminal:
-ml snakemake/5.2.4-foss-2016b-Python-3.6.6
-ml R/3.6.1-foss-2016b-fh1
-ml Python/3.6.6-foss-2016b
-ml BCFtools/1.9-foss-2016b
-ml Pysam/0.15.1-foss-2016b-Python-3.6.6
-ml PyYAML/3.13-foss-2016b-Python-3.6.6
+ml snakemake/5.19.2-foss-2019b-Python-3.7.4
+ml R/3.6.2-foss-2019b-fh1
+ml Python/3.7.4-foss-2019b-fh1
+ml BCFtools/1.9-GCC-8.3.0
+ml Pysam/0.15.4-GCC-8.3.0-Python-3.7.4
+ml PyYAML/5.1.2-GCCcore-8.3.0-Python-3.7.4
 
 #command to run snakemake (remove -np at end when done validating):
 snakemake -s TitanCNA.snakefile --latency-wait 60 --restart-times 3 --keep-going --cluster-config config/cluster_slurm.yaml --cluster "sbatch -p {cluster.partition} --mem={cluster.mem} -t {cluster.time} -c {cluster.ncpus} -n {cluster.ntasks} -o {cluster.output}" -j 20 -np
