@@ -1,42 +1,9 @@
-#NelsonLab_NEPCWGS
 samples:
-  PN002:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN002/PN002_recalibrated.bam
-  PN003:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN003/PN003_recalibrated.bam
-  PN004:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN004/PN004_recalibrated.bam
-  PN006:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN006/PN006_recalibrated.bam
-  PN008:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN008/PN008_recalibrated.bam
-  PN014:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN014/PN014_recalibrated.bam
-  PN017:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN017/PN017_recalibrated.bam
-  PN020:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN020/PN020_recalibrated.bam
-  PN021:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN021/PN021_recalibrated.bam
-  PN023:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN023/PN023_recalibrated.bam
-  PN025:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN025/PN025_recalibrated.bam
-  PN026:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN026/PN026_recalibrated.bam
-  PN001:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN001/PN001_recalibrated.bam
-  PN005:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN005/PN005_recalibrated.bam
-  PN007:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN007/PN007_recalibrated.bam
-  PN015:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN015/PN015_recalibrated.bam
-  PN018:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN018/PN018_recalibrated.bam
-  PN019:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN019/PN019_recalibrated.bam
-  PN022:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN022/PN022_recalibrated.bam
-  PN024:  /fh/scratch/delete90/ha_g/Collaborator_Data/WGS/fastq_to_bam_paired_snakemake/results/PN024/PN024_recalibrated.bam
+  tumor1:  /filepath/tumor1.bam
+  normal1:  /filepath/normal1.bam
+  tumor2:  /filepath/tumor2.bam
+  normal2:  /filepath/normal2.bam
 
-pairings:
-  PN002:  PN001
-  PN003:  PN001
-  PN004:  PN001
-  PN006:  PN005
-  PN008:  PN007
-  PN014:  PN015
-  PN017:  PN018
-  PN020:  PN019
-  PN021:  PN022
-  PN023:  PN024
-  PN025:  PN022
-  PN026:  PN022
-
-
-
-
-
-
+pairings: #format is tumor_name: normal_name
+  tumor1:  normal1
+  tumor2:  normal2
