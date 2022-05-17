@@ -89,6 +89,9 @@ offset.factor <- 1.15 # sv drawn outside of plot
 lcol <- NULL
 arr.col <- NULL
 svabaCol <- "black"
+#https://stackoverflow.com/questions/57153428/r-plot-color-combinations-that-are-colorblind-accessible
+svCol <- c('TandemDuplication'='#D55E00', 'Deletion'='#009E73', 'Inversion'='#332288',
+  'Translocation'='#0072B2','Balanced'='#F0E442','Unbalanced'='#CC79A7') #"black"
 manualCol <- "purple"
 bsg <- paste0("BSgenome.Hsapiens.UCSC.", genomeBuild)
 if (!require(bsg, character.only=TRUE, quietly=TRUE, warn.conflicts=FALSE)) {
@@ -96,7 +99,6 @@ if (!require(bsg, character.only=TRUE, quietly=TRUE, warn.conflicts=FALSE)) {
 } else {
 	seqinfo <- seqinfo(get(bsg))
 }
-seqlevelsStyle(seqinfo) <- genomeStyle
 
 if (zoom){
   xlim <- c(startPos, endPos)
@@ -116,13 +118,13 @@ if (zoom){
   #yaxis <- "logratio"
   plotAtCentre <- FALSE
   cnColor <- FALSE
-  plotIdio <- TRUE
+  plotIdio <- FALSE
   plotSegs <- FALSE
 }
 if (chrStr == "0" || is.null(chrStr) || chrStr == "None"){
   chrStr <- as.character(c(1:22, "X"))
 }
-seqlevelsStyle(chrStr)[1] <- genomeStyle
+seqlevelsStyle(chrStr) <- genomeStyle
 if (plotType == "titan"){
 	cnColor <- TRUE
 	plotAllelicFrac <- TRUE
@@ -152,7 +154,7 @@ if (!is.null(geneList) && geneList != "None"){
   genes <- NULL
 }
 colnames(genes) <- c("Gene", "Chr", "Start", "End")
-seqlevelsStyle(genes$Chr)[1] <- genomeStyle
+seqlevelsStyle(genes$Chr) <- genomeStyle
 
 if (genomeBuild == "hg38" && file.exists(cytobandFile)){
   cytoband <- as.data.frame(fread(cytobandFile))
@@ -190,12 +192,19 @@ if (plotType == "titan"){
 ulp <- ulp[Chr %in% chrStr]
 ulp$Chr <- factor(ulp$Chr, levels = chrStr)
 ulp <- ulp[order(Chr, Start)]
-ulp <- ulp[!is.na(get(colName))]
 
 ############# load Combined SV (SVABA, GROC, LongRanger) ##############
-sv <- fread(svFile)
-#save.image(file=outImage)
-
+#print(svFile)
+if (!is.null(svFile)){
+  sv <- fread(svFile)
+  sv[, SV.class := CN_overlap_type]
+  sv[grepl("TandemDup", CN_overlap_type), SV.class := "TandemDuplication"]
+  sv[grepl("Inversion", CN_overlap_type), SV.class := "Inversion"]
+  sv[grepl("Trans", CN_overlap_type), SV.class := "Translocation"]
+  sv[is.na(CN_overlap_type), SV.class := "Unbalanced"]
+  sv[, color := svCol[SV.class]]
+  #save.image(file=outImage)
+}
 #####################################
 ########## PLOT CHR RESULTS #########
 #####################################	 
@@ -226,9 +235,13 @@ for (j in 1:length(chrStr)){
   }else{
   	pdf(outPlotFile, width = width, height=height)
 	}
-  if (plotAllelicFrac){ par(mfrow=c(2,1)); spacing <- 0  }
+  if (plotAllelicFrac){ 
+    par(mfrow=c(2,1)); spacing <- 0  
+  }else{
+    spacing <- 3
+  }
 	
-  if (plotSegs) { segsToPlot <- as.data.frame(segs) } else { segsToPlot <- NULL}
+  if (plotSegs) { segsToPlot <- segs } else { segsToPlot <- NULL}
   
   if (grepl("X", chrStr[j])) { cnCol <- rep("#000000", 30) }
   message("Plotting read depth CN")
@@ -237,7 +250,7 @@ for (j in 1:length(chrStr)){
       yrange=ylim, xlim=xlim, spacing=spacing, xaxt=xaxt, cex = cex, gene.cex = 1,
       plot.title = plotTitle)
 
-  if (nrow(sv) > 0){
+  if (!is.null(svFile) && nrow(sv) > 0){
       centreLine <- 0
     
     if (yaxis == "integer"){
@@ -257,6 +270,7 @@ for (j in 1:length(chrStr)){
 										interchr = interchr, plotAtCentre = plotAtCentre,
 										xlim=xlim, arcHeight=ylimSV, ploidy = NULL, lty = 1, offset.factor=offset.factor,
 										centreLine=centreLine, buffer=buffer, lcol=manualCol, arr.col=rescueCol, 
+                    svTypeCol=!is.null(svCol), lwd = 2,
 										endhead = plotArrows, arr.pos = 1.0, minSPAN = 0)
   	}	
 
@@ -267,6 +281,7 @@ for (j in 1:length(chrStr)){
     							chr=chrStr[j], interchr = interchr, plotAtCentre = plotAtCentre,
                   xlim=xlim, arcHeight=ylimSV, ploidy = NULL, lty = 1, offset.factor=offset.factor,
                   centreLine=centreLine, buffer=buffer, lcol=svabaCol, arr.col=svabaCol, 
+                  svTypeCol=!is.null(svCol), lwd = 2,
                   endhead = plotArrows, arr.pos = 1.0, minSPAN = 0)
      ## plot SVABA arcs ##
     #message("Plotting svaba")
@@ -274,33 +289,36 @@ for (j in 1:length(chrStr)){
     							chr=chrStr[j], interchr = interchr, plotAtCentre = plotAtCentre,
                   xlim=xlim, arcHeight=ylimSV, ploidy = NULL, lty = 1, offset.factor=offset.factor,
                   centreLine=centreLine, buffer=buffer, lcol=svabaCol, arr.col=svabaCol, 
-                  endhead = plotArrows, arr.pos = 1.0, minSPAN = 0)  }
+                  svTypeCol=!is.null(svCol), lwd = 2,
+                  endhead = plotArrows, arr.pos = 1.0, minSPAN = 0)  
+  }
   
   if (plotAllelicFrac){
     message("Plotting allelic fraction")
     plotAllelicRatio(dataIn=ulp[,-1], chr=chrStr[j], geneAnnot=NULL,  xlab="", ylim=c(0,1), 
-    	xlim=xlim, cex=cex, cex.axis=1.5, cex.lab=1.5, spacing = 6)
+    	xlim=xlim, cex=0.25, cex.axis=1.5, cex.lab=1.5, spacing = 6)
 	  par(xpd=NA)
     
     if (genomeBuild == "hg38" && file.exists(cytobandFile)){
       sl <- seqlengths(seqinfo[chrStr[j]])
-      pI <- plotIdiogram.hg38(chrStr[j], cytoband=cytoband, seqinfo=seqinfo, xlim=c(0, max(sl)), unit="bp", label.y=-0.425, new=FALSE, ylim=c(-0.3,-0.15))	
+      pI <- plotIdiogram.hg38(chrStr[j], cytoband=cytoband, seqinfo=seqinfo, xlim=c(0, max(sl)), unit="bp", label.y=-0.35, new=FALSE, ylim=c(-0.3,-0.15))	
     }else{
-      pI <- plotIdiogram(chrStr[j], build="hg19", unit="bp", label.y=-0.4, new=FALSE, ylim=c(-0.3,-0.15))
+      pI <- plotIdiogram(chrStr[j], build="hg19", unit="bp", label.y=-0.6, new=FALSE, ylim=c(-0.3,-0.15))
     }
   }else{ # not plotting allelic fraction
     if (!zoom){
       par(xpd=NA)
       if (genomeBuild == "hg38" && file.exists(cytobandFile)){
         sl <- seqlengths(seqinfo[chrStr[j]])
+        plotYlim <- par("usr")[3:4]
+        if (plotYlim[1] != ylim[1]){
+          ylim <- plotYlim
+        }
         pI <- plotIdiogram.hg38(chrStr[j], cytoband=cytoband, seqinfo=seqinfo, unit="bp", label.y=ylim[1]-(ylim[2]-ylim[1])*0.275, new=FALSE, ylim=c(ylim[1]-(ylim[2]-ylim[1])*0.15,ylim[1]-(ylim[2]-ylim[1])*0.075))
       }else{
         pI <- plotIdiogram(chrStr[j], build="hg19", unit="bp", label.y=ylim[1]-(ylim[2]-ylim[1])*0.275, new=FALSE, ylim=c(ylim[1]-(ylim[2]-ylim[1])*0.15,ylim[1]-(ylim[2]-ylim[1])*0.075))
       }
     }
   }
-
-  
-  dev.off()
-		
+	dev.off()
 }
