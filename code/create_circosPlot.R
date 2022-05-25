@@ -19,6 +19,7 @@ option_list <- list(
   make_option(c("--genomeBuild"), type="character", default="hg38", help="Geome build. Default: [%default]"),
   make_option(c("--genomeStyle"), type = "character", default = "UCSC", help = "NCBI or UCSC chromosome naming convention; use UCSC if desired output is to have \"chr\" string. [Default: %default]"),
   make_option(c("--excludeCNoverlapType"), type = "character", default = "c(\"Unknown-ShortSVwithCN\")", help = "Exclude SV class."),
+  make_option(c("--excludeChrs"), type = "character", default = "c()", help = "Exclude Chromosome"),
   make_option(c("--excludeTools"), type = "character", default = "c()", help = "Exclude SVs predicted by these tools"),
   make_option(c("--outPlotFile"), type="character", help="Path to output figure file.")
 )
@@ -33,9 +34,11 @@ cnFile <- opt$cnFile
 geneFile <- opt$geneFile
 genomeBuild <- opt$genomeBuild
 genomeStyle <- opt$genomeStyle
+excludeChrs <- as.character(eval(parse(text = opt$excludeChrs)))
 excludeCNoverlapType <- eval(parse(text = opt$excludeCNoverlapType))
 excludeTools <- eval(parse(text = opt$excludeTools))
 outPlotFile <- opt$outPlotFile
+
 
 if (!is.null(geneFile)) gene.lable.data <- read.table (geneFile, sep="\t", header=T)
 
@@ -50,13 +53,13 @@ if(genomeBuild =="hg38"){
 cyto.info <- as.data.table(cyto.info)
 
 #Setup RCircos core components
-RCircos.Set.Core.Components(cyto.info, tracks.inside=4, tracks.outside=0) 
+RCircos.Set.Core.Components(cyto.info, tracks.inside=4, chr.exclude=excludeChrs, tracks.outside=0) 
 
-# Can update params here
-# params <- RCircos.Get.Plot.Parameters() #$char.width
-# params$text.size <- 0.4
-# params$track.padding  <- 0.07
-# RCircos.Reset.Plot.Parameters(params)
+#Can update params here
+params <- RCircos.Get.Plot.Parameters() #$char.width
+params$text.size <- 0.4
+params$track.padding  <- 0.07
+RCircos.Reset.Plot.Parameters(params)
 
 # load SV data and filter
 sv.data <- fread(svFile, head=T)
@@ -78,9 +81,13 @@ for (i in sv.data[, unique(chrom1)]){
 	sv.data[chrom2 == i & end2 > chrEndCoord, end2 := chrEndCoord]
 }
 
+sv.data <- sv.data[!chrom1 %in% excludeChrs & !chrom2 %in% excludeChrs]
+
 # load CNV data
 cnv.data <- fread(cnFile, head=T)
 cnv.data.trim <- cnv.data[, c("Chromosome","Start","End","Corrected_Copy_Number")]
+cnv.data.trim <- cnv.data.trim[!Chromosome %in% excludeChrs]
+
 
 
 if (!is.null(geneFile)){
@@ -89,14 +96,19 @@ if (!is.null(geneFile)){
 	RCircos.Chromosome.Ideogram.Plot()
 	RCircos.Gene.Connector.Plot(gene.lable.data, track.num = 1, side = "in")
 	RCircos.Gene.Name.Plot(gene.lable.data, name.col = 4, track.num = 2)
-	RCircos.Histogram.Plot(cnv.data.trim, data.col=4, track.num=3, side="in")
+	#had issues with histogram 
+	#By definition, histogram plot represents the data with bars of same width. 
+	#The bar width in RCircos histogram plot can be adjusted with hist.width parameter. But, all bars still use same width.
+	#RCircos.Histogram.Plot(cnv.data.trim, data.col=4, track.num=3, side="in")
+    RCircos.Polygon.Plot(cnv.data.trim, track.num=3, data.col=4, genomic.columns=3, side="in", polygon.col="red", is.sorted=TRUE)
 	RCircos.Link.Plot(sv.data, track.num=4, by.chromosome=FALSE)
 	dev.off()
 } else{
 	pdf(outPlotFile, onefile=T, height=8, width=8, compress=TRUE)
 	RCircos.Set.Plot.Area()
 	RCircos.Chromosome.Ideogram.Plot()
-	RCircos.Histogram.Plot(cnv.data.trim, data.col=4, track.num=1, side="in")
+	#RCircos.Histogram.Plot(cnv.data.trim, data.col=4, track.num=1, side="in")
+	RCircos.Polygon.Plot(cnv.data.trim, track.num=1, data.col=4, genomic.columns=3, side="in", polygon.col="red", is.sorted=TRUE)
 	RCircos.Link.Plot(sv.data, track.num=2, by.chromosome=FALSE)
 	dev.off()
 }
