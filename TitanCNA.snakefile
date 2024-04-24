@@ -6,6 +6,7 @@ ml Python/3.7.4-foss-2019b-fh1
 ml BCFtools/1.9-GCC-8.3.0
 ml Pysam/0.15.4-GCC-8.3.0-Python-3.7.4
 ml PyYAML/5.1.2-GCCcore-8.3.0-Python-3.7.4
+ml ImageMagick/7.1.0-53-GCCcore-12.2.0
 
 #command to run snakemake (remove -np at end when done validating):
 snakemake -s TitanCNA.snakefile --latency-wait 60 --restart-times 3 --keep-going --cluster-config config/cluster_slurm.yaml --cluster "sbatch -p {cluster.partition} --mem={cluster.mem} -t {cluster.time} -c {cluster.ncpus} -n {cluster.ntasks} -o {cluster.output}" -j 20 -np
@@ -28,9 +29,12 @@ rule all:
 		expand("results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.seg.txt", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]]),
 		expand("results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.cna.txt", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]]),
 		"results/titan/hmm/optimalClusterSolution.txt",
-		"results/titan/hmm/optimalClusterSolution/"
+		"results/titan/hmm/optimalClusterSolution/",
+		expand("results/CurationFiles/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.pdf", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]])
+		
 		
 rule runTitanCNA:
+	priority: 10
 	input:
 		alleleCounts="results/titan/tumCounts/{tumor}.tumCounts.txt",
 		corrDepth="results/ichorCNA/{tumor}/{tumor}.correctedDepth.txt"		
@@ -38,7 +42,8 @@ rule runTitanCNA:
 		titan="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.txt",
 		param="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.params.txt",
 		segTxt="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.segs.txt",
-		seg="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.seg"
+		seg="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.seg",
+		rdata="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.RData"
 	params:
 		outRoot="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}/",
 		titanRscript=config["TitanCNA_rscript"],
@@ -64,14 +69,17 @@ rule runTitanCNA:
 	shell:
 		"Rscript {params.titanRscript} --hetFile {input.alleleCounts} --cnFile {input.corrDepth} --outFile {output.titan} --outSeg {output.segTxt} --outParam {output.param} --outIGV {output.seg} --outPlotDir {params.outRoot} --libdir {params.libdir} --id {wildcards.tumor} --numClusters {wildcards.clustNum} --numCores {params.numCores} --normal_0 {params.normal} --ploidy_0 {wildcards.ploidy} --genomeStyle {params.genomeStyle} --genomeBuild {params.genomeBuild} --cytobandFile {params.cytobandFile} --chrs \"{params.chrs}\" --gender {params.sex} --estimateNormal {params.estimateNormal} --estimatePloidy {params.estimatePloidy} --estimateClonality {params.estimateClonality}  --centromere {params.centromere} --alphaK {params.alphaK} --txnExpLen {params.txnExpLen} --plotYlim \"{params.plotYlim}\" > {log} 2> {log}"
 	
+
 rule combineTitanAndIchorCNA:
+	priority: 2
 	input:
 		titanSeg="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.segs.txt", 
 		titanBin="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.txt",
 		titanParam="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.params.txt",
 		ichorSeg="results/ichorCNA/{tumor}/{tumor}.seg.txt",
 		ichorBin="results/ichorCNA/{tumor}/{tumor}.cna.seg",
-		ichorParam="results/ichorCNA/{tumor}/{tumor}.params.txt"
+		ichorParam="results/ichorCNA/{tumor}/{tumor}.params.txt",
+		rdata="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.RData"
 	output:
 		segFile="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.seg.txt",
 		binFile="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.cna.txt",
@@ -80,13 +88,16 @@ rule combineTitanAndIchorCNA:
 		libdir=config["TitanCNA_libdir"],
 		centromere=config["centromere"],
 		sex=config["sex"],
-		mergeIchorHOMD=config["mergeIchorHOMD"]
+		mergeIchorHOMD=config["mergeIchorHOMD"],
+		rescueTITANgaps=config["rescueTITANgaps"]
 	log:
 		"logs/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.combineTitanIchorCNA.log"
 	shell:
-		"Rscript {params.combineScript} --libdir {params.libdir} --titanSeg {input.titanSeg} --titanBin {input.titanBin} --titanParam {input.titanParam} --ichorSeg {input.ichorSeg} --ichorBin {input.ichorBin} --ichorParam {input.ichorParam} --mergeIchorHOMD {params.mergeIchorHOMD} --sex {params.sex} --outSegFile {output.segFile} --outBinFile {output.binFile} --centromere {params.centromere} > {log} 2> {log}"	
-	
+		"Rscript {params.combineScript} --libdir {params.libdir} --titanSeg {input.titanSeg} --titanBin {input.titanBin} --titanParam {input.titanParam} --ichorSeg {input.ichorSeg} --ichorBin {input.ichorBin} --ichorParam {input.ichorParam} --mergeIchorHOMD {params.mergeIchorHOMD} --rescueTITANgaps {params.rescueTITANgaps} --sex {params.sex} --outSegFile {output.segFile} --outBinFile {output.binFile} --centromere {params.centromere} --titan_Rdata {input.rdata} > {log} 2> {log}"	
+
+
 rule selectSolution:
+	priority: 1
 	input:
 		#ploidyDirs=expand("results/titan/hmm/titanCNA_ploidy{ploidy}/", ploidy=PLOIDY[config["TitanCNA_maxPloidy"]]),
 		resultFiles=expand("results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.txt", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]])
@@ -113,6 +124,7 @@ rule selectSolution:
 		Rscript {params.solutionRscript} --ploidyRun2 $ploidyRun2 --ploidyRun3 $ploidyRun3 --ploidyRun4 $ploidyRun4 --threshold {params.threshold} --outFile {output} > {log} 2> {log}
 		"""
 		
+
 rule copyOptSolution:
 	input:
 		"results/titan/hmm/optimalClusterSolution.txt"
@@ -131,4 +143,19 @@ rule copyOptSolution:
 		done		
 		"""
 
-	
+
+rule createCurationFiles:
+	priority: -1
+	input:
+		params_file="results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.params.txt",
+	output:
+		"results/CurationFiles/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.pdf"
+	params:
+		script=config["TitanCNA_curation_script"]
+	log:
+		"logs/titanCuration/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}_curation.log"
+	shell:
+		"(python3 {params.script} --input_params_file_path {input.params_file} ) 2> {log}"
+
+
+ruleorder: runTitanCNA > combineTitanAndIchorCNA > selectSolution > copyOptSolution > createCurationFiles

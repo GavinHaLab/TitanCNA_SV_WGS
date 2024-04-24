@@ -36,7 +36,7 @@ rule ichorCNA:
 		cna="results/ichorCNA/{tumor}/{tumor}.cna.seg",
 		segTxt="results/ichorCNA/{tumor}/{tumor}.seg.txt",
 		#seg="results/ichorCNA/{tumor}/{tumor}.seg",
-		#rdata="results/ichorCNA/{tumor}/{tumor}.RData",
+		#rdata="results/ichorCNA/{tumor}/{tumor}.RData"
 	params:
 		outDir="results/ichorCNA/{tumor}/",
 		rscript=config["ichorCNA_rscript"],
@@ -57,7 +57,7 @@ rule ichorCNA:
 		maxCN=config["ichorCNA_maxCN"],
 		includeHOMD=config["ichorCNA_includeHOMD"],
 		chrs=config["ichorCNA_chrs"],
-		#chrTrain=config["ichorCNA_chrTrain"],
+		chrTrain=config["ichorCNA_chrTrain"],
 		likModel=config["ichorCNA_likModel"],
 		centromere=config["centromere"],
 		exons=config["ichorCNA_exons"],
@@ -77,3 +77,4 @@ rule ichorCNA:
 		"logs/ichorCNA/{tumor}.log"	
 	shell:
 		"Rscript {params.rscript} --libdir {params.libdir} --id {params.id} --WIG {input.tum} --repTimeWig {params.repTimeWig} --sex {params.sex} --gcWig {params.gcwig} --mapWig {params.mapwig} --NORMWIG {input.norm} --ploidy \"{params.ploidy}\" --normal \"{params.normal}\" --maxCN {params.maxCN} --includeHOMD {params.includeHOMD} --genomeStyle {params.genomeStyle} --genomeBuild {params.genomeBuild} --chrs \"{params.chrs}\" --estimateNormal {params.estimateNormal} --estimatePloidy {params.estimatePloidy} --estimateScPrevalence {params.estimateClonality} --scStates \"{params.scStates}\" --likModel {params.likModel} --minMapScore {params.minMapScore} --maxFracGenomeSubclone {params.maxFracGenomeSubclone} --maxFracCNASubclone {params.maxFracCNASubclone} --normal2IgnoreSC {params.normal2IgnoreSC} --scPenalty {params.scPenalty} --centromere {params.centromere} --exons.bed {params.exons} --txnE {params.txnE} --txnStrength {params.txnStrength} --fracReadsInChrYForMale {params.fracReadsChrYMale} --plotFileType {params.plotFileType} --plotYLim \"{params.plotYlim}\" --outDir {params.outDir} > {log} 2> {log}"
+
