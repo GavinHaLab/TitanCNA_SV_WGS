@@ -57,3 +57,8 @@ rule catAlleleCountFiles:
 	shell:
 		"cat {input} | grep -v Chr > {output} 2> {log}"
 
+
+
+
+
+
