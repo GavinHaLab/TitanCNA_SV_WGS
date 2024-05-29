@@ -48,7 +48,7 @@ library(ggplot2)
 library(reshape2)
 library(diagram)
 library(tools)
-#library(SNPchip)
+library(SNPchip)
 library(VariantAnnotation)
 library(TitanCNA)
 
