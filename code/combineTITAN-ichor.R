@@ -11,21 +11,29 @@
 #' @import optparse
 
 library(optparse)
+library(TitanCNA)
+library(stringr)
+library(data.table)
+library(GenomicRanges)
+library(dplyr)
 
 option_list <- list(
-	make_option(c("--titanSeg"), type="character", help="TitanCNA segs.txt file. Required."),
+  make_option(c("--titanSeg"), type="character", help="TitanCNA segs.txt file. Required."),
 	make_option(c("--titanBin"), type="character", help="TitanCNA titan.txt file. Required."),
 	make_option(c("--titanParams"), type="character", help="TitanCNA params.txt file. Required."),
-  	make_option(c("--ichorSeg"), type="character", help="ichorCNA segs.txt file. Required."),
+	make_option(c("--ichorSeg"), type="character", help="ichorCNA segs.txt file. Required."),
 	make_option(c("--ichorBin"), type="character", help="ichorCNA cna.seg file. Required."),
 	make_option(c("--ichorParams"), type="character", help="ichorCNA params.txt file. Required."),
-	make_option(c("--ichorNormPanel"), type="character", help="Panel of normals; bin-level black list."),
+	make_option(c("--ichorNormPanel"), type="character", default=NULL, help="Panel of normals; bin-level black list."),
 	make_option(c("--mergeIchorHOMD"), type="logical", default = FALSE, help="Merge ichorCNA HOMD segment into final combined segments."),
+	make_option(c("--isPDXorCellLine"), type="logical", default = FALSE, help="Insert TITAN missing hetSite data using corresponding bins from ichorCNA for specific samples"),
+	make_option(c("--correctSegmentsInBins"), type="logical", default = FALSE, help="Correct segment copy number for consecutive bins that match in copy number but differ from segment copy number. Use only with --isPDXorCellLine"),
 	make_option(c("--sex"), type="character", default="female", help="female or male. Default [%default]."),
 	make_option(c("--libdir"), type="character", help="TitanCNA directory path to source R files if custom changes made."),
-  	make_option(c("--outSegFile"), type="character", help="New combined segment file. Required"),
-  	make_option(c("--outBinFile"), type="character", help="New combined bin-level file. Required"),
-  	make_option(c("--centromere"), type="character", default=NULL, help="Centromere table.")  
+	make_option(c("--codedir"), type="character", help="TitanCNA coding directory path for downstream processes."),
+	make_option(c("--outSegFile"), type="character", help="New combined segment file. Required"),
+	make_option(c("--outBinFile"), type="character", help="New combined bin-level file. Required"),
+	make_option(c("--centromere"), type="character", default=NULL, help="Centromere table.")
   )
 
 parseobj <- OptionParser(option_list=option_list, usage = "usage: Rscript %prog [options]")
@@ -40,20 +48,24 @@ ichorBin <- opt$ichorBin
 ichorParams <- opt$ichorParams
 ichorNormPanel <- opt$ichorNormPanel
 mergeIchorHOMD <- as.logical(opt$mergeIchorHOMD)
+rescueTITAN <- as.logical(opt$isPDXorCellLine)
+correctSegmentsInBins <- as.logical(opt$correctSegmentsInBins)
 gender <- opt$sex
 outSegFile <- opt$outSegFile
 outBinFile <- opt$outBinFile
 centromere <- opt$centromere
 libdir <- opt$libdir
+codedir <- opt$codedir
 outImageFile <- gsub(".seg.txt", ".RData", outSegFile)
 
-library(TitanCNA)
-library(stringr)
-library(data.table)
-library(GenomicRanges)
+# Get the output path for the repaired PDF file, using the same directory as the Bin file output path
+if (rescueTITAN){
+	outplot_repaired <- paste0(gsub("/[^/]*$", "", outBinFile), "/")
+}
 
 if (!is.null(libdir) && libdir != "None"){
-	source(paste0(libdir, "/R/utils.R"))
+  source(paste0(libdir, "/R/utils.R"))
+  source(paste0(libdir, "/R/plotting.R"))
 }
 
 options(stringsAsFactors=F, width=150, scipen=999)
@@ -232,32 +244,224 @@ setcolorder(cn, c(cols, colnames(cn)[!colnames(cn) %in% cols]))
 # }
 #segs <- segs[ind.segs.remove, FILTER := "EXCLUDE"]
 
-## correct copy number beyond maximum CN state based on purity and logR
-correctCN <- correctIntegerCN(cn, segs, purity, ploidyT, maxCNtoCorrect.autosomes = NULL, 
-		maxCNtoCorrect.X = NULL, correctHOMD = TRUE, minPurityToCorrect = 0.05, gender = gender, chrs = chrs)
-segs <- correctCN$segs
-cn <- correctCN$cn
-## extend segments to remove gaps
+if (rescueTITAN) {
+	logRCN_name <- paste0(id,".logR_Copy_Number")
+	CCN_name <- paste0(id,".Corrected_Copy_Number")
+	cn_repaired <- fill_cellular_prevalence(cn, logRCN_name, CCN_name)
+
+	## correct copy number beyond maximum CN state based on purity and logR
+	correctCN <- correctIntegerCN(cn_repaired, segs, purity, ploidyT, maxCNtoCorrect.autosomes = NULL, 
+								maxCNtoCorrect.X = NULL, correctHOMD = TRUE, minPurityToCorrect = 0.05, gender = gender, chrs = chrs)
+	segs <- correctCN$segs
+	cn <- correctCN$cn
+} else {
+	## correct copy number beyond maximum CN state based on purity and logR
+	correctCN <- correctIntegerCN(cn, segs, purity, ploidyT, maxCNtoCorrect.autosomes = NULL, 
+								maxCNtoCorrect.X = NULL, correctHOMD = TRUE, minPurityToCorrect = 0.05, gender = gender, chrs = chrs)
+	segs <- correctCN$segs
+	cn <- correctCN$cn
+}
+
 centromeres <- fread(centromere)
-segs <- extendSegments(segs, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
-	chrs = chrs, genomeStyle = genomeStyle)
+
+#### For cases where sample is high-purity tumor ran in tumor-only mode ####
+if (rescueTITAN == TRUE) {
+  ##################################### FIXING SEGS FILE OUTPUT #####################################
+  ## Adjust ichorCNA segment copy numbers to match TitanCNA baseline
+  ichor_2.segs <- copy(ichor.segs)
+  ichor_2.segs[grepl("X", Chromosome), logR_Copy_Number := logRbasedCN(Median_logR, purity, ploidyT, cn=2)]
+  ichor_2.segs[!grepl("X", Chromosome), logR_Copy_Number := logRbasedCN(Median_logR, purity, ploidyT, cn=1)]
+  ichor_2.segs[, Corrected_Copy_Number := as.integer(round(logR_Copy_Number))]
+  ichor_2.segs[, Corrected_Call := ichorCNmap[Corrected_Copy_Number + 1]]
+  ichor_2.segs[, Corrected_logR := log2(logR_Copy_Number / ploidy)]
+  ichor_2.segs[, Start := Start_Position.bp.]; ichor_2.segs[, End := End_Position.bp.]
+  
+  ## Load file
+  titan.gr <- copy(segs)
+  
+  ## Remove "sparse" regions from TITAN
+  print("...repairing sparse regions from TITAN seg file")
+  # Remove the individual rows in which there is only 1 SNP per 1-bp length segment
+  titan_subset <- subset(titan.gr, (titan.gr$End != (titan.gr$Start))) # PRIMARY ISSUE: needed to remove TitanCNA's single position calls to accomodate ichor's segments
+  # Create a vector that calculates the ratio of the length of the segment to the number of SNPs in the segment
+  titan_subset$Density.snp. <- ((titan_subset$Length.snp.) / (titan_subset$End - titan_subset$Start))
+  # Get the 0.05 quantile threshold for the density of SNPs in the segments
+  density_quantile_05 <- quantile(titan_subset$Density.snp., probs=c(0.05))
+  # Create a vector that annotates for each row that, if the density of SNPs in the segment is greater than 2 standard deviations from the mean, then it is a "sparse" segment - annotate sparse with -1, otherwise 0
+  titan_subset$Sparse <- ifelse(titan_subset$Density.snp. < (density_quantile_05), -1, 0)
+  
+  ## If the segment is sparse and the length.snp. is less than 100, then remove the segment
+  titan_subset_filtered <- subset(titan_subset, (titan_subset$Sparse != -1) | (titan_subset$Length.snp. > 100))
+  
+  titan_subset_filtered[, Start := Start]; titan_subset_filtered[, End := End]
+  
+  ########## Fix bin and segment files ##########
+  print("...Fixing Bin File for Empty Areas")
+  cn2 <- fill_cn_blanks_if_ichor(cn)
+  
+  ## Initialize segments for regions where gaps exceed 10kb
+  titan_subset_filtered <- initialize_new_segments(titan_subset_filtered, ichor_2.segs)
+  
+  
+  print("...Beginning sparsity removal re-fill of values")
+  ## Fill in the new segments with median values from corresponding ichorCNA bins
+  titan_subset_filtered <- fill_new_segments(titan_subset_filtered, cn2)
+  
+  
+  print("...processing segments")
+  segs2 <- extendSegments(titan_subset_filtered, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
+                          chrs = chrs, genomeStyle = genomeStyle)
+  
+  segs_plotting <- copy(segs2)
+  setnames(segs_plotting, c("Start", "End"), c("Start_Position.bp.", "End_Position.bp."))
+  
+  ########## Process cn_plotting ##########
+  cn_plotting <- cn2[ (which(!is.na(cn2$Position) & !is.na(cn2$logR_Copy_Number))),]
+  cn_plotting <- cn_plotting[,c("Chr", "Position", "RefCount", "Depth", "AllelicRatio", "LogRatio", "CopyNumber", "TITANstate", "TITANcall", "ClonalCluster", "CellularPrevalence", "logR_Copy_Number", "Corrected_logR", "Corrected_Ratio", "Corrected_Copy_Number", "Corrected_Call")]
+  cn_plotting$Chr <- factor(cn_plotting$Chr, levels = chrs)
+  cn_plotting <- cn_plotting[order(cn_plotting$Chr), ]
+
+  ########## Process segment-based copy number ##########
+  ## Create a new column for segment-based copy number in the cn_plotting category
+  seg_copy_numbers <- numeric(length = nrow(cn_plotting))
+  print("...processing segment_based copy")
+  for (i in 1:nrow(cn_plotting)) {
+    # Check if POSITION falls between START and END in table 2
+    matched_row <- which(cn_plotting$Chr[i] == segs_plotting$Chromosome & cn_plotting$Position[i] >= segs_plotting$Start_Position.bp. & cn_plotting$Position[i] <= segs_plotting$End_Position.bp.)
+    # If a match is found, extract the copy number
+    if (length(matched_row) > 0) {
+      seg_copy_numbers[i] <- segs_plotting$Corrected_Copy_Number[matched_row]
+    } else {
+      seg_copy_numbers[i] <- cn_plotting$Corrected_Copy_Number[i]  # If no match found, store Corrected_Copy_Number
+    }
+    if (cn_plotting$Chr[i] == "chrX") {
+      cn_plotting$Corrected_Copy_Number[i] <- seg_copy_numbers[i]
+    }
+  }
+  ## Assign segment copy numbers to the cn_plotting table
+  cn_plotting$Segment_Copy_Number <- seg_copy_numbers
+  
+  # Optional fine-tuning: if multiple bins have a shared copy number that also differs from Segment_Copy_Number, replace Segment_Copy_Number with the shared copy number
+  # Threshold represents the minimum number of bins that have to share copy number to be considered
+  if (correctSegmentsInBins) {
+	corCN_col = "Corrected_Copy_Number"
+	segCN_col = "Segment_Copy_Number"
+	cn_plotting <- correct_segCN_bins(cn_plotting, CorrectedCN_Col=corCN_col, SegCN_Col=segCN_col, threshold=50)
+  }
+  
+  ########## Plotting repaired Titan-Ichor Genome-Wide Plots ##########
+  print("...loading plotting parameters")
+  
+  chrs_plot <- c(chrs, "chrX")
+  
+  ## Plotting Titan-Ichor Repaired File
+  cn_plotting_dt <- as.data.table(cn_plotting)
+  
+  # Load  in TitanSvaba plotting library to load plotTitanIchorCNA function
+  source(paste0(codedir, "/plotting.R"))
+  
+  ## Invoke plotting parameters and function
+  ("...preparing to plot")
+#   normCN <- 2
+  yaxis <- "integer"
+  ylim <- c(-2, 4)
+#   ploidyS <- purity * ploidyT + (1-purity) * normCN
+#   ploidyX <- purity * ploidyT/2 + (1 - purity) * normCN
+  if (yaxis == "integer"){
+    cn_plotting_dt[!grepl("X",Chr), logR_Copy_Number := (logRbasedCN(LogRatio, purity, ploidyT, cn=2))]
+    cn_plotting_dt[grepl("X",Chr), logR_Copy_Number := (logRbasedCN(LogRatio, purity, ploidyT, cn=1))]
+    cn_plotting_dt[, Corrected_Copy_Number := round(logR_Copy_Number)]
+    
+    # Correct Corrected_Copy_Number values without Cellular_Prevalence using logRbasedCN within both titan_ichor_merged and titan_ichor_new_method
+    # Create a new column in titan_ichor_merged called "Adjusted_Copy_Number" that uses logRbasedCN to correct the Copy_Number values
+    segs_plotting[!grepl("X", Chromosome), Adjusted_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=2))]
+    segs_plotting[grepl("X", Chromosome), Adjusted_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=1))]
+    
+    adj_copy_numbers <- numeric(length = nrow(cn_plotting_dt))
+    
+    for (i in 1:nrow(cn_plotting_dt)) {
+      # Check if POSITION falls between START and END in table 2
+      matched_row <- which(cn_plotting_dt$Chr[i] == segs_plotting$Chromosome & cn_plotting_dt$Position[i] >= segs_plotting$Start_Position.bp. & cn_plotting_dt$Position[i] <= segs_plotting$End_Position.bp.)
+      # If a match is found, extract the copy number
+      if (length(matched_row) > 0) {
+        adj_copy_numbers[i] <- segs_plotting$Adjusted_Copy_Number[matched_row]
+      } else {
+        adj_copy_numbers[i] <- cn_plotting_dt$Corrected_Copy_Number[i]  # If no match found, store NA
+        # adj_copy_numbers[i] <- NA
+      }
+      if (cn_plotting_dt$Chr[i] == "chrX") {
+        cn_plotting_dt$Corrected_Copy_Number[i] <- adj_copy_numbers[i]
+      }
+    }
+    cn_plotting_dt$Adjusted_Segment_Copy_Number <- adj_copy_numbers
+
+    ### Adjust segment copy numbers again to account for new calculation without CP + generate new "segments" based on CN copy number distribution
+	if (correctSegmentsInBins) {
+		cn_plotting_dt2 <- copy(cn_plotting_dt)
+
+		for (i in 1:nrow(cn_plotting_dt2)) {
+			if (cn_plotting_dt2$Adjusted_Segment_Copy_Number[i] != cn_plotting_dt2$Corrected_Copy_Number[i]) {
+				counter <- 1
+				for (j in (i+1):nrow(cn_plotting_dt2)) {
+				if (cn_plotting_dt2$Adjusted_Segment_Copy_Number[j] != cn_plotting_dt2$Corrected_Copy_Number[j]) {
+					counter <- counter + 1
+				} else {
+					break
+				}
+				}
+				if (counter > 10) {
+					for (j in i:(i+counter)) {
+						cn_plotting_dt2$Adjusted_Segment_Copy_Number[j] <- cn_plotting_dt2$Corrected_Copy_Number[j]
+					}
+				}
+			}
+		}
+	}
+    colName <- "logR_Copy_Number"
+  }else{
+    cn_plotting_dt[!grepl("X",Chr), LogRatio := LogRatio + log2(ploidyS / 2)]
+    cn_plotting_dt[grepl("X", Chr), LogRatio := LogRatio + log2(ploidyX / 2)]
+    segs_plotting$LogRatio <- segs_plotting$Median_logR
+    segs_plotting$LogRatio <- segs_plotting$LogRatio + log2(ploidyS / 2)
+    colName <- "LogRatio"
+  }
+  
+  print("Plotting...")
+  outFile_pdf <- paste0(outplot_repaired, id, "_TitanIchor_Repaired_GenomeWide_logRCN.pdf")
+  pdf(paste0(outFile_pdf),width=20,height=6)
+  plotTitle <- paste0(id, "_TitanIchorCNA GenomeWide LogR-Copy-Number (Adjusted Segment CN Coloring)")
+  plotTitanIchorCNA(as.data.frame(cn_plotting_dt), chr=chrs_plot, colName=colName, callColName="Adjusted_Segment_Copy_Number", cytoBand=FALSE, purity=purity, ploidyT=ploidyT, yaxis=yaxis,
+                    cnCol=NULL, yrange=ylim, genomewide=TRUE, spacing=4, xaxt="n", cex=0.5, gene.cex=1.5, plot.title=plotTitle)
+  dev.off()
+  
+  cn_out <- copy(cn2)
+  segs_out <- copy(segs2)
+  
+  write.table(cn_plotting_dt, file = paste0(outplot_repaired, id, ".TitanIchor.repaired-seg.cna.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
+  write.table(segs_plotting, file = paste0(outplot_repaired, id, ".TitanIchor.repaired-seg.segs.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
+  
+} else {
+  segs_out <- extendSegments(segs, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
+                             chrs = chrs, genomeStyle = genomeStyle)
+  cn_out <- copy(cn)
+}
 
 ## write segments to file ##
-write.table(segs, file = outSegFile, col.names=T, row.names=F, quote=F, sep="\t")
-write.table(cn, file = outBinFile, col.names=T, row.names=F, quote=F, sep="\t")
+write.table(segs_out, file = outSegFile, col.names=T, row.names=F, quote=F, sep="\t")
+write.table(cn_out, file = outBinFile, col.names=T, row.names=F, quote=F, sep="\t")
 ## write segments without germline SNPs
 outSegNoSNPFile <- gsub(".txt", ".noSNPs.txt", outSegFile)
-write.table(segs[, -c("Start.snp", "End.snp")], file = outSegNoSNPFile, col.names=T, row.names=F, quote=F, sep="\t")
+write.table(segs_out[, -c("Start.snp", "End.snp")], file = outSegNoSNPFile, col.names=T, row.names=F, quote=F, sep="\t")
+
+save.image(outImageFile)
 
 ## write segments in IGV / GISTIC format ##
-igv <- segs[, .(Sample, Chromosome, Start.snp, End.snp, Length.snp., logR_Copy_Number)]
+igv <- segs_out[, .(Sample, Chromosome, Start.snp, End.snp, Length.snp., logR_Copy_Number)]
 igv[Chromosome %in% chrs[1:22], Corrected.logR := log2(logR_Copy_Number / 2)]
 igv[Chromosome == chrs[grep("X", chrs)], Corrected.logR := log2(logR_Copy_Number / 1)]
 igv[, logR_Copy_Number := NULL]
 outIGVFile <- gsub("seg.txt", "segIGV.txt", outSegFile)
 write.table(igv, file = outIGVFile, col.names=T, row.names=F, quote=F, sep="\t")
-
-save.image(outImageFile)
 
 
 

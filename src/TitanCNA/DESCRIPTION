@@ -1,0 +1,21 @@
+Package: TitanCNA
+Type: Package
+Title: Subclonal copy number and LOH prediction from whole genome sequencing
+        of tumours
+Version: 1.23.1
+Date: 2019-05-24
+Author: Gavin Ha
+Maintainer: Gavin Ha <gha@fredhutch.org>
+Depends: R (>= 3.5.1)
+Imports: IRanges (>= 2.6.1), GenomicRanges (>= 1.24.3), VariantAnnotation (>= 1.18.7),
+        foreach (>= 1.4.3), GenomeInfoDb (>= 1.8.7), 
+        data.table (>= 1.10.4), dplyr (>= 0.5.0), 
+Description: Hidden Markov model to segment and predict regions of
+        subclonal copy number alterations (CNA) and loss of
+        heterozygosity (LOH), and estimate cellular prevalence of
+        clonal clusters in tumour whole genome sequencing data.
+License: GPL-3
+biocViews: Sequencing, WholeGenome, DNASeq, ExomeSeq,
+        StatisticalMethod, CopyNumberVariation, HiddenMarkovModel,
+        Genetics, GenomicVariation, ImmunoOncology
+URL: https://github.com/gavinha/TitanCNA
