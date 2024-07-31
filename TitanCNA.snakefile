@@ -28,7 +28,7 @@ rule all:
 		expand("results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.seg.txt", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]]),
 		expand("results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.cna.txt", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]]),
 		"results/titan/hmm/optimalClusterSolution.txt",
-		"results/titan/hmm/optimalClusterSolution/"
+		"results/titan/hmm/optimalClusterSolution/",
 		
 rule runTitanCNA:
 	input:
@@ -80,11 +80,13 @@ rule combineTitanAndIchorCNA:
 		libdir=config["TitanCNA_libdir"],
 		centromere=config["centromere"],
 		sex=config["sex"],
-		mergeIchorHOMD=config["mergeIchorHOMD"]
+		mergeIchorHOMD=config["mergeIchorHOMD"],
+		isPDXorCellLine=config["isPDXorCellLine"],
+		correctSegmentsInBins=config["correctSegmentsInBins"]
 	log:
 		"logs/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.combineTitanIchorCNA.log"
 	shell:
-		"Rscript {params.combineScript} --libdir {params.libdir} --titanSeg {input.titanSeg} --titanBin {input.titanBin} --titanParam {input.titanParam} --ichorSeg {input.ichorSeg} --ichorBin {input.ichorBin} --ichorParam {input.ichorParam} --mergeIchorHOMD {params.mergeIchorHOMD} --sex {params.sex} --outSegFile {output.segFile} --outBinFile {output.binFile} --centromere {params.centromere} > {log} 2> {log}"	
+		"Rscript {params.combineScript} --libdir {params.libdir} --titanSeg {input.titanSeg} --titanBin {input.titanBin} --titanParam {input.titanParam} --ichorSeg {input.ichorSeg} --ichorBin {input.ichorBin} --ichorParam {input.ichorParam} --mergeIchorHOMD {params.mergeIchorHOMD} --isPDXorCellLine {params.isPDXorCellLine} --correctSegmentsInBins {params.correctSegmentsInBins} --sex {params.sex} --outSegFile {output.segFile} --outBinFile {output.binFile} --centromere {params.centromere} > {log} 2> {log}"	
 	
 rule selectSolution:
 	input:
