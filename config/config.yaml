@@ -135,4 +135,4 @@ plot_type:  titan ## titan - will include haplotype fraction
 plot_format:  png
 plot_ichor_units: logratio
 
-
+interpreter: python3
