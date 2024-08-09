@@ -134,20 +134,28 @@ plotRearrangementArcs <- function (sv, cn, ploidy = NULL, interchr=TRUE, xlim=NU
 }
 
 ## format of dataIn is output from /home/unix/gavinha/software/code/git/scripts/titan/analysis/combineTITAN-ichor.R
-plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callColName="Corrected_Call", segs=NULL, chr=NULL, purity = NULL, ploidyT = NULL, geneAnnot=NULL, yrange=c(-4,6), yaxis = "logRatio", xlim=NULL, xaxt = "n", cex = 0.5, gene.cex = 0.5, plot.title = NULL, cnCol = NULL, spacing=4, cytoBand=T, alphaVal=1, main){
+plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callColName="Corrected_Call", segs=NULL, chr=NULL, purity = NULL, ploidyT = NULL, geneAnnot=NULL, yrange=c(-4,6), yaxis = "logRatio", xlim=NULL, xaxt = "n", cex = 0.5, gene.cex = 0.5, plot.title = NULL, cnCol = NULL, spacing=4, cytoBand=T, genomewide=F, alphaVal=1, main){
   #color coding
   alphaVal <- ceiling(alphaVal * 255); class(alphaVal) = "hexmode"
   alphaSubcloneVal <- ceiling(alphaVal / 2 * 255); class(alphaVal) = "hexmode"
   subcloneCol <- c("#00FF00")
-  if (is.null(cnCol)){
-		cnCol <- c("#00FF00","#006400","#0000FF","#8B0000",rep("#FF0000", 26))
-		cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000")
-	}else{
+  if (is.null(cnCol) & (genomewide==FALSE)){
+    cnCol <- c("#00FF00","#006400","#0000FF","#8B0000",rep("#FF0000", 26))
+    cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000")
+    names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
+  } else if (is.null(cnCol) & (genomewide==TRUE) & ((callColName == "Segment_Copy_Number") | callColName == "Corrected_Copy_Number" | callColName == "Adjusted_Segment_Copy_Number")) {
+    cnCol <- c("#00FF00", "#006400", "#0000FF", "#880000",rep("#FF0000", 26))
+    cnCol <- paste(cnCol, alphaVal, sep = "")
+    names(cnCol)[1:30] <- c(0,1,2,3,4,5,6:25)
+  } else if (is.null(cnCol) & (genomewide == TRUE)) {
+    cnCol <- c("#00FF00","#006400","#0000FF","#8B0000",rep("#FF0000", 26))
+    cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000")
+    names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
+	} else {
 		cnCol.col <- as.character(cnCol[1])
 		cnCol <- c(cnCol, "HET"=cnCol.col, "DLOH"=cnCol.col, "NLOH"=cnCol.col, "ALOH"=cnCol.col, "ASCNA"=cnCol.col, "BCNA"=cnCol.col, "UBCNA"=cnCol.col)
+		names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
 	}
-	names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
-	#cnCol <- paste(cnCol,alphaVal,sep="")
   # adjust for ploidy #
   normCN <- 2
   if (!is.null(ploidyT) & yaxis != "integer"){
@@ -159,29 +167,25 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
     }
   }
   
-  
   if (!is.null(chr)){
-    for (i in chr){
-      dataByChr <- dataIn[dataIn[,"Chr"]==as.character(i),]
-       ## set y axis labels as either integer or logR copy number
-      #avgTumPloidy <- round(ploidyT)
- 
+    if (genomewide) {
+      dataByChr <- dataIn[dataIn[,"Chr"] %in% chr, ]
+      dataByChr <- subset(dataByChr, !is.na(dataByChr[, colName]))
+       
       zero <- 0.5  
       cn <- c(0, 1, 2, 4, `^`(2, 3:(yrange[2]+1)))
-      #ploidyToUse <- ploidyS
-      if (i == "X"){
-        normCN <- 1
-        zero <- 0.25
-        cn <- c(0, 1, 2, 4, `^`(2, 3:(yrange[2]+1)))
-      }      
+      #ploidyToUse <- ploidyS   
       if (yaxis == "integer"){
         y.ticks <- log2(cn)
         y.ticks[1] <- log2(zero)  
         yrange[1] <- y.ticks[1]    
-        ylab <- "Copy Number"
+        ylab <- "Copy Number (logR)"
         #dataByChr[, colName] <- log2(logRbasedCN(dataByChr[, colName], purity, ploidyT, cn=normCN))
         dataByChr[, colName] <- log2(dataByChr[, colName])
-        dataByChr[dataByChr[[colName]] < -1 , colName] <- -1
+        if (colName != "LogRatio") {    ## Added conditional for this line
+          dataByChr[dataByChr[[colName]] < -1 , colName] <- -1
+        }
+        # dataByChr[dataByChr[[colName]] < -1 , colName] <- -1
         if (!is.null(segs)){
       		segs[, colName] <- log2(segs[, colName])# + log2(ploidyS / 2)
     		}
@@ -194,41 +198,107 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
         ylab <- "Copy Number (log2 ratio)"
         centreLine <- 0
       }
-
-      #plot the data
-      #if (outfile!=""){ pdf(outfile,width=10,height=6) }
+      # plot the data
       par(mar=c(spacing,8,4,2))
-      #par(xpd=NA)
-      coord <- (as.numeric(dataByChr[,"End"]) + as.numeric(dataByChr[,"Start"]))/2
-      if (is.null(xlim)){
-        xlim <- c(1,as.numeric(dataByChr[dim(dataByChr)[1],"Start"]))
-        xaxt <- "n"
+      dataByChr_table <- as.data.table(dataByChr)
+      coord <- getGenomeWidePositions(dataByChr_table[, Chr], dataByChr_table[, Position]) # Original line
+
+      if (callColName == "Segment_Copy_Number") {
+        dataByChr_table[, Segment_Copy_Number := Segment_Copy_Number + 1]
+        # dataByChr_table[grepl("X",Chr), Segment_Copy_Number := Segment_Copy_Number + 2]
+        dataByChr <- as.data.frame(dataByChr_table)
+      } else if (callColName == "Corrected_Copy_Number") {
+          dataByChr_table[, Corrected_Copy_Number := Corrected_Copy_Number + 1]
+          dataByChr <- as.data.frame(dataByChr_table)
+      } else if (callColName == "Adjusted_Segment_Copy_Number") {
+          dataByChr_table[, Adjusted_Segment_Copy_Number := Adjusted_Segment_Copy_Number + 1]
+          dataByChr <- as.data.frame(dataByChr_table)
+      } else {
+        dataByChr <- as.data.frame(dataByChr_table)
       }
-      if (is.null(plot.title)){
-        plot.title <- paste("Chromosome ",i,sep="")
-      }
-      ## plot logR for bins ##
-      plot(coord,as.numeric(dataByChr[, colName]),col=cnCol[dataByChr[,callColName]],
-           pch=16, ylim=yrange, yaxt="n",
-           xlim=xlim, xaxt = xaxt, xlab="",ylab=ylab,
-           cex.lab=1.5,cex.axis=1.5, cex=cex,las=1)
+      col <- cnCol[dataByChr[,callColName]]
+      plot(coord$posns, as.numeric(dataByChr[, colName]),
+        col=col,
+        pch=16, ylim=yrange, yaxt="n",
+        xlim=xlim, xaxt = xaxt, xlab="",ylab=ylab,
+        cex.lab=1.5,cex.axis=1.5, cex=cex,las=1)
       axis(2, at=y.ticks, labels=cn, las=2, cex.axis=1.5)
       title(plot.title, line = 1.25, xpd=NA, cex.main=1.5)
-      ## plot centre line ##
-      lines(c(1,tail(na.omit(dataByChr[,3]), 1)),rep(centreLine,2),type="l",col="grey",lwd=0.75)
-      if (!is.null(segs)){
-        segsByChr <- segs[segs[,"Chromosome"]==as.character(i),,drop=FALSE]
-        #ind <- segsByChr$subclone.status == FALSE
-        apply(segsByChr, 1, function(x){
-          lines(x[c("Start","End")], rep(x[colName], 2), col = cnCol[x[callColName]], lwd = 3)
-          invisible()
-        })
-        #if (sum(!ind) > 0){
-        #  apply(segsByChr[!ind, ], 1, function(x){
-        #    lines(x[c("Start","End")], rep(x["Median_logR"], 2), col = subcloneCol, lwd = 3)
-        #    invisible()
-        #  })
-        #}
+
+      lines(as.numeric(c(1, coord$posns[length(coord$posns)])), rep(centreLine,2), type = "l", col = "grey", lwd = 2)
+
+      plotChrLines(dataByChr_table[, Chr], coord$chrBkpt, par("yaxp")[1:2])
+    
+    } else {
+      for (i in chr){
+        dataByChr <- dataIn[dataIn[,"Chr"]==as.character(i),]
+        ## set y axis labels as either integer or logR copy number
+        #avgTumPloidy <- round(ploidyT)
+  
+        zero <- 0.5  
+        cn <- c(0, 1, 2, 4, `^`(2, 3:(yrange[2]+1)))
+        #ploidyToUse <- ploidyS
+        if (i == "X"){
+          normCN <- 1
+          zero <- 0.25
+          cn <- c(0, 1, 2, 4, `^`(2, 3:(yrange[2]+1)))
+        }      
+        if (yaxis == "integer"){
+          y.ticks <- log2(cn)
+          y.ticks[1] <- log2(zero)  
+          yrange[1] <- y.ticks[1]    
+          ylab <- "Copy Number"
+          #dataByChr[, colName] <- log2(logRbasedCN(dataByChr[, colName], purity, ploidyT, cn=normCN))
+          dataByChr[, colName] <- log2(dataByChr[, colName])
+          dataByChr[dataByChr[[colName]] < -1 , colName] <- -1
+          if (!is.null(segs)){
+            segs[, colName] <- log2(segs[, colName])# + log2(ploidyS / 2)
+          }
+          centreLine <- log2(normCN)
+        }else{      
+          #dataByChr[, colName] <- dataByChr[, colName] + log2(ploidyS / 2)
+          cnLog <- log2(cn[-which(cn==3)] / normCN)  
+          cn <- seq(-2,yrange[2],2)#c(-2, cn)
+          y.ticks <- cn
+          ylab <- "Copy Number (log2 ratio)"
+          centreLine <- 0
+        }
+
+        #plot the data
+        #if (outfile!=""){ pdf(outfile,width=10,height=6) }
+        par(mar=c(spacing,8,4,2))
+        #par(xpd=NA)
+        coord <- (as.numeric(dataByChr[,"End"]) + as.numeric(dataByChr[,"Start"]))/2
+        if (is.null(xlim)){
+          xlim <- c(1,as.numeric(dataByChr[dim(dataByChr)[1],"Start"]))
+          xaxt <- "n"
+        }
+        if (is.null(plot.title)){
+          plot.title <- paste("Chromosome ",i,sep="")
+        }
+        ## plot logR for bins ##
+        plot(coord,as.numeric(dataByChr[, colName]),col=cnCol[dataByChr[,callColName]],
+            pch=16, ylim=yrange, yaxt="n",
+            xlim=xlim, xaxt = xaxt, xlab="",ylab=ylab,
+            cex.lab=1.5,cex.axis=1.5, cex=cex,las=1)
+        axis(2, at=y.ticks, labels=cn, las=2, cex.axis=1.5)
+        title(plot.title, line = 1.25, xpd=NA, cex.main=1.5)
+        ## plot centre line ##
+        lines(c(1,tail(na.omit(dataByChr[,3]), 1)),rep(centreLine,2),type="l",col="grey",lwd=0.75)
+        if (!is.null(segs)){
+          segsByChr <- segs[segs[,"Chromosome"]==as.character(i),,drop=FALSE]
+          #ind <- segsByChr$subclone.status == FALSE
+          apply(segsByChr, 1, function(x){
+            lines(x[c("Start","End")], rep(x[colName], 2), col = cnCol[x[callColName]], lwd = 3)
+            invisible()
+          })
+          #if (sum(!ind) > 0){
+          #  apply(segsByChr[!ind, ], 1, function(x){
+          #    lines(x[c("Start","End")], rep(x["Median_logR"], 2), col = subcloneCol, lwd = 3)
+          #    invisible()
+          #  })
+          #}
+        }
       }
       
       if (cytoBand==TRUE){
@@ -502,3 +572,273 @@ plotIdiogram.hg38 <- function (chromosome, cytoband, seqinfo, cytoband.ycoords, 
 }
 
 
+# Function to fill in CellularPrevalence for NA rows
+fill_cellular_prevalence <- function(data, logRCN_col, CCN_col) {
+  # Loop through dataframe
+  for (i in 1:nrow(data)) {
+    # Absolute restriction: Do not work with rows that have no value in ichor.logR_Copy_Number or are chrX
+    if (data[i, "Chr"] == "chrX") {
+      next
+    } else {
+      if ((is.na(data[i, ..logRCN_col])) & (i != 1)) {
+        print(paste0("Skipping this row due to absent logR_Copy_Number: ", i))
+        next
+      }
+      # Zeroth case: if the current row is the FIRST row, assign the CellularPrevalence value from the first non-NA row to this current row
+      if (i == 1 & is.na(data[i, "CellularPrevalence"])) {
+        first_non_na <- i
+        while (is.na(data[first_non_na, "CellularPrevalence"])) {
+          first_non_na <- first_non_na + 1
+        }
+        data[i, "CellularPrevalence"] <- data[first_non_na, "CellularPrevalence"]
+      }
+      # Same if the current row is the LAST row
+      else if (i == nrow(data) & is.na(data[i, "CellularPrevalence"])) {
+        last_non_na <- i
+        while (is.na(data[last_non_na, "CellularPrevalence"])) {
+          last_non_na <- last_non_na - 1
+        }
+        data[i, "CellularPrevalence"] <- data[last_non_na, "CellularPrevalence"]
+      }
+      # First Case: Where we can easily assign NA rows - if the current row has NA in CellularPrevalence and the value in the previous row is non-NA and is the SAME as the first non-NA row after current, assign the same CellularPrevalence to this row
+      else if ((i != 1) & (i != nrow(data)) & (is.na(data[i, "CellularPrevalence"]))) {
+        first_non_na_before <- i - 1
+        while (is.na(data[first_non_na_before, "CellularPrevalence"])) {
+          first_non_na_before <- first_non_na_before - 1
+        }
+        first_non_na_after <- i + 1
+        while (is.na(data[first_non_na_after, "CellularPrevalence"])) {
+          if ((first_non_na_after == nrow(data)) & (is.na(data[first_non_na_after, "CellularPrevalence"]))) {
+            # Treat for the possibility that the last FEW rows are NA in CellularPrevalence; in that case, just fill in the rest with the same CellularPrevalence as the first_non_na_before
+            data[first_non_na_after, "CellularPrevalence"] <- data[first_non_na_before, "CellularPrevalence"]
+            break
+          } 
+          first_non_na_after <- first_non_na_after + 1
+        }
+        # if (first_non_na_after)
+        if ((!is.na(data[i-1, "CellularPrevalence"]) & !is.na(data[i+1, "CellularPrevalence"]))) {
+          if (data[i-1, "CellularPrevalence"] == data[first_non_na_after, "CellularPrevalence"]) {
+            data[i, "CellularPrevalence"] <- data[i-1, "CellularPrevalence"]
+            print(paste0("Row number: ", i, ", error is here in first case...............done"))
+          # Second case: Where the current row has NA in CellularPrevalence and the value in the previous row is non-NA and the value is non-NA in the next row, and they are different. In this case, compare the id.logR_Copy_Number values, and assign the CellularPrevalence from the row with the id.logR_Copy_Number value closest to current row
+          } else if ((data[i-1, "CellularPrevalence"] != data[i+1, "CellularPrevalence"])  & (!is.na(data[first_non_na_before, ..logRCN_col]) & (!is.na(data[first_non_na_after, ..logRCN_col])))) {
+            if (!is.na(data[i, ..logRCN_col])) {
+              diff_before <- abs(data[i, ..logRCN_col] - data[i-1, ..logRCN_col])
+              diff_after <- abs(data[i, ..logRCN_col] - data[i+1, ..logRCN_col])
+              if (diff_before < diff_after) {
+                data[i, "CellularPrevalence"] <- data[i-1, "CellularPrevalence"]
+              } else {
+                data[i, "CellularPrevalence"] <- data[i+1, "CellularPrevalence"]
+              }
+            }
+            print(paste0("Row number: ", i, ", error is here in second case...............done"))
+          }
+        }
+        # Third-1 Case: if there are multiple NA rows in a row, we need to get the CellularPrevalence value for the first non-NA row before the NA rows, and if it matches the CellularPrevalence value to the first non-NA row after the NA rows, assign that same CellularPrevalence to all the NA rows
+        else if ((!is.na(data[first_non_na_before, "CellularPrevalence"]) & is.na(data[i+1, "CellularPrevalence"]))) {
+          if (data[first_non_na_before, "CellularPrevalence"] == data[first_non_na_after, "CellularPrevalence"]) {
+            data[i, "CellularPrevalence"] <- data[first_non_na_before, "CellularPrevalence"]
+            print(paste0("Row number: ", i, ", error is here in third-1 case...............done"))
+          }
+          # Third-2 case: if there are multiple NA rows, and the CellularPrevalence value is different for the first non-NA row before the NA rows compared to the CellularPrevalence value from the first non-NA row after the NA rows: take the average of the id.logR_Copy_Number values for the block of non-NA rows before current row that share the same CellularPrevalence up to the previous NA row or change in CellularPrevalence, and take the average of the id.logR_Copy_Number values for the block of non-NA rows after the current row that share the same CellularPrevalence, up to either the next NA row or change in CellularPrevalence. Compare the current row's id.logR_Copy_Number each of the two averages, and assign to this current row the CellularPrevalence value from the block of non-NA rows (before or after current row) that the current row's id.logR_Copy_Number is closest to.
+          else if ((data[first_non_na_before, "CellularPrevalence"] != data[first_non_na_after, "CellularPrevalence"])) {
+              # Get the average .logR_Copy_Number of all rows before current row that have the same CellularPrevalence, up until the row that either is NA in CellularPrevalence or has a different CellularPrevalence value
+              check_cp_before <- TRUE
+              if (!is.na(data[i, ..logRCN_col])) {
+                sum_before <- data[first_non_na_before, ..logRCN_col]
+                count_before <- 0
+                latest_before_row <- first_non_na_before
+                # Get the overall sum for .logR_Copy_Number and count of the rows that are above first_non_na_before that share the same CellularPrevalence value (and are non-NA)
+                while (check_cp_before) {
+                  if (latest_before_row != 1) {
+                    before_row <- latest_before_row - 1
+                    # print(paste0("........iterating row ", before_row))
+                    if (!is.na(data[before_row, "CellularPrevalence"]) & (data[before_row, "CellularPrevalence"] == data[latest_before_row, "CellularPrevalence"])) {
+                      sum_before <- sum_before + data[before_row, ..logRCN_col]
+                      count_before <- count_before + 1
+                      latest_before_row <- before_row
+                    } else {
+                      check_cp_before <- FALSE
+                    }
+                  }
+                  check_cp_before <- FALSE
+                }
+                avg_before <- sum_before / count_before
+                # Get the average id.logR_Copy_Number of all non-NA CellularPrevalence rows after current row, up until the next row that is NA in CellularPrevalence or has a different CellularPrevalence value
+                check_cp_after <- TRUE
+                sum_after <- data[first_non_na_after, ..logRCN_col]
+                count_after <- 0
+                latest_after_row <- first_non_na_after
+                # Get the overall sum for id.logR_Copy_Number and count of the rows that are below after that share the same CellularPrevalence value (and are non-NA)
+                while (check_cp_after) {
+                  if (latest_after_row != nrow(data)) {
+                    after_row <- latest_after_row + 1
+                    if ((!is.na(data[after_row, "CellularPrevalence"])) & (data[after_row, "CellularPrevalence"] == data[latest_after_row, "CellularPrevalence"])) {
+                      sum_after <- sum_after + data[after_row, ..logRCN_col]
+                      count_after <- count_after + 1
+                      latest_after_row <- after_row
+                    } else {
+                      check_cp_after <- FALSE
+                    }
+                  }
+                  check_cp_after <- FALSE
+                }
+                avg_after <- sum_after / count_after
+                diff_before <- abs(data[i, ..logRCN_col] - avg_before)
+                diff_after <- abs(data[i, ..logRCN_col] - avg_after)
+                if (diff_before < diff_after) {
+                  data[i, "CellularPrevalence"] <- data[first_non_na_before, "CellularPrevalence"]
+                } else {
+                  data[i, "CellularPrevalence"] <- data[first_non_na_after, "CellularPrevalence"]
+                }
+              } else {
+                  if (data[i, ..CCN_col] == data[first_non_na_before, ..CCN_col]) {
+                    data[i, "CellularPrevalence"] <- data[first_non_na_before, "CellularPrevalence"]
+                  } else if (data[i, ..CCN_col] == data[first_non_na_after, ..CCN_col]) {
+                data[i, "CellularPrevalence"] <- data[first_non_na_after, "CellularPrevalence"]
+                }
+              }
+              print(paste0("Row number: ", i, ", error is here in third-2 case...............done"))
+          }
+        } 
+      } 
+    } 
+  }
+  return (data)
+}
+
+# Function to adjust seg file positions based on ichorCNA insertion (from merging version)
+adjustPositionsForInsertions <- function(table) {
+  for (row in 2:(nrow(table) - 1)) {
+    cur_row <- table[row,]
+    prev_row <- table[(row - 1),]
+    next_row <- table[(row+1),]
+    if ((is.na(cur_row$Length.snp.)) & (all(sapply(list(prev_row$Chromosome, cur_row$Chromosome, next_row$Chromosome), function(x) x == cur_row$Chromosome)))) {
+      if (((cur_row$Start) < (prev_row$End))) {
+        table[row, "Start"] <- ((table[row-1, "End"]) + 1)
+      }
+      if ((cur_row$End) > (next_row$Start)) {
+        table[row, "End"] <- ((table[row+1, "Start"]) - 1)
+      }
+      if ((cur_row$End) < (cur_row$Start)) {
+        table[row, "End"] <- ((table[row, "Start"]) + 1)
+      }
+    }
+  }
+  return(table)
+}
+
+# Function to fill in Position values for NA rows in bin file (that have data from ichorCNA)
+fill_cn_blanks_if_ichor <- function(table) {
+  table %>%
+    mutate(Position = if_else(
+      is.na(Position) & !is.na(.[[ncol(.)]]), 
+      .$Start, 
+      Position
+    )) %>%
+    return()
+}
+
+
+# Function to partition "empty" segments from the segment file, for processing with ichor bins
+initialize_new_segments <- function(titan_segs_table, ichor_segs_table) {
+  for (row in 1:(nrow(titan_segs_table) - 1)) {
+  # For row 1 specifically: if the start of current row is greater than the End of row 1 in the cn2 file, then insert a row before the first row of all NA values except for the sample, chromosome, and start and end positions using start and end position from the cn2 file
+    cur_row <- titan_segs_table[row,]
+    first_ichor_seg_of_chr <- (ichor_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome,])[1,]
+    last_ichor_seg_of_chr <- (ichor_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome,])[nrow(ichor_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome,]),]
+    first_titan_seg_of_chr <- (titan_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome,])[1,]
+    last_titan_seg_of_chr <- (titan_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome,])[nrow(titan_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome,]),]
+    if (row == 1) {
+      prev_row <- ichor_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome & Start < cur_row$Start,]
+      if ((nrow(prev_row) != 0)) {
+        # if (cur_row$Start > prev_row$End) {
+        titan_segs_table <- rbind(data.table(Sample=cur_row$Sample, Chromosome=cur_row$Chromosome, Start=prev_row$Start, End=(cur_row$Start-1), Length.snp.=NA, Median_logR=NA, TITAN_call=NA, logR_Copy_Number=NA, Copy_Number=NA, Corrected_Copy_Number=NA, Corrected_Call=NA, Corrected_logR=NA, Corrected_MinorCN=NA, Corrected_MajorCN=NA, MinorCN=NA, MajorCN=NA, Sparse=1), titan_segs_table, fill=TRUE)
+        # }
+      }
+  # If current row is the FIRST row in which the chromosome value changes to a new value, treat it the same case as row 1
+    } else if ((cur_row$Start == first_titan_seg_of_chr$Start) & (cur_row$Start > first_ichor_seg_of_chr$Start) & (cur_row$End < first_ichor_seg_of_chr$End) & (row != 2)) {
+    # if ((cur_row == first_titan_seg_of_chr) & (cur_row$Start > first_ichor_seg_of_chr$Start)) {
+      prev_row <- ichor_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome & Start < cur_row$Start & End > cur_row$End,]
+      if ((nrow(prev_row) != 0)) {
+        # if (cur_row$Start > prev_row$End) {
+          titan_segs_table <- rbind(titan_segs_table[1:(row-1),], data.table(Sample=cur_row$Sample, Chromosome=cur_row$Chromosome, Start=prev_row$Start, End=(cur_row$Start-1), Length.snp.=NA, Median_logR=NA, TITAN_call=NA, logR_Copy_Number=NA, Copy_Number=NA, Corrected_Copy_Number=NA, Corrected_Call=NA, Corrected_logR=NA, Corrected_MinorCN=NA, Corrected_MajorCN=NA, MinorCN=NA, MajorCN=NA, Sparse=1), titan_segs_table[row:nrow(titan_segs_table),], fill=TRUE)
+        # }
+      }
+  # # If current row is the LAST row in which the chromosome value is the current row before itchanges to new row, treat similar to above case
+  #   } else if ((cur_row$End == last_titan_seg_of_chr$End) & (cur_row$End < last_ichor_seg_of_chr$End)) {
+  #     next_row <- ichor_segs_table[Sample == cur_row$Sample & Chromosome == cur_row$Chromosome & End > cur_row$End,]
+  #     if ((nrow(next_row) != 0)) {
+  #       # if (cur_row$End < next_row$Start) {
+  #         titan_segs_table <- rbind(titan_segs_table[1:(row-1),], data.table(Sample=cur_row$Sample, Chromosome=cur_row$Chromosome, Start=(cur_row$End+1), End=next_row$End, Length.snp.=NA, Median_logR=NA, TITAN_call=NA, logR_Copy_Number=NA, Copy_Number=NA, Corrected_Copy_Number=NA, Corrected_Call=NA, Corrected_logR=NA, Corrected_MinorCN=NA, Corrected_MajorCN=NA, MinorCN=NA, MajorCN=NA, Sparse=1), titan_segs_table[row:nrow(titan_segs_table),], fill=TRUE)
+  #       # }
+  #     }
+    } else {
+      prev_row <- titan_segs_table[(row - 1),]
+      next_row <- titan_segs_table[(row+1),]
+      if ((all(sapply(list(prev_row$Chromosome, cur_row$Chromosome, next_row$Chromosome), function(x) x == cur_row$Chromosome))) & ((cur_row$Start - prev_row$End) > 100000)) {
+        titan_segs_table <- rbind(titan_segs_table[1:(row-1),], data.table(Sample=cur_row$Sample, Chromosome=cur_row$Chromosome, Start=prev_row$End+1, End=cur_row$Start-1, Length.snp.=NA, Median_logR=NA, TITAN_call=NA, logR_Copy_Number=NA, Copy_Number=NA, Corrected_Copy_Number=NA, Corrected_Call=NA, Corrected_logR=NA, Corrected_MinorCN=NA, Corrected_MajorCN=NA, MinorCN=NA, MajorCN=NA, Sparse=1), titan_segs_table[row:nrow(titan_segs_table),], fill=TRUE)
+      }
+    }
+  }
+  return(titan_segs_table)
+}
+
+
+# Function to fill in the "empty" segments from the ichorCNA bin file
+fill_new_segments <- function(titan_segs_table, bin_table) {
+    for (row in 1:nrow(titan_segs_table)) {
+    cur_row <- titan_segs_table[row,]
+    if (cur_row$Sparse == 1) {
+      bin_table_subset <- bin_table[which(cn2$Sample == cur_row$Sample & bin_table$Chr == cur_row$Chromosome & bin_table$Position >= cur_row$Start & bin_table$Position <= cur_row$End),]
+      titan_segs_table[row, Length.snp. := sum(!is.na(bin_table_subset$Position))]
+      # Create a further subset in which Position values are not NA
+      bin_table_subset <- bin_table_subset[which(!is.na(bin_table_subset$Position)),]
+      # Also take the median of their logR_Copy_Number values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, logR_Copy_Number := median(bin_table_subset$logR_Copy_Number, na.rm=TRUE)]
+      # Also take the median of their Corrected_logR values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Corrected_logR := median(bin_table_subset$Corrected_logR, na.rm=TRUE)]
+      # Also take the median of their Corrected_Copy_Number values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Corrected_Copy_Number := median(bin_table_subset$Corrected_Copy_Number, na.rm=TRUE)]
+      # Also take the median of their Copy_Number values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Copy_Number := median(bin_table_subset$CopyNumber, na.rm=TRUE)]
+      # Also take the median of their Corrected_Call values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Corrected_Call := median(bin_table_subset$Corrected_Call, na.rm=TRUE)]
+      # Also take the median of their CellularPrevalence values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Cellular_Prevalence := median(bin_table_subset$CellularPrevalence, na.rm=TRUE)]
+      # Also take the median of their Corrected_Ratio values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Corrected_Ratio := median(bin_table_subset$Corrected_Ratio, na.rm=TRUE)]
+      # Also take th median of their LogRatio values for all rows in which Position is not NA and assign it to the sparse row
+      titan_segs_table[row, Median_logR := median(bin_table_subset$LogRatio, na.rm=TRUE)]
+    }
+  }
+  return(titan_segs_table)
+}
+
+
+# Function to check segment copy numbers in bin file, and correct if necessary
+correct_segCN_bins <- function(bin_table, CorrectedCN_Col, SegCN_Col, threshold) {
+  for (i in 1:nrow(bin_table)) {
+    # Do the same with Segment_Copy_Number
+    if (abs(bin_table$Segment_Copy_Number[i] - bin_table$Corrected_Copy_Number[i]) >= 2) {
+      bin_table$Segment_Copy_Number[i] <- bin_table$Corrected_Copy_Number[i]
+    }
+    # Other condition: keep a counter of the number of rows in a row in which Segment_Copy_Number or NewMethod_Segment_Copy_Number differs from Corrected_Copy_Number; if that number is greater than 10, then replace Segment_Copy_Number or NewMethod_Segment_Copy_Number with Corrected_Copy_Number for all rows within the counter. Counter resets as soon as there is a row in which Segment_Copy_Number or NewMethod_Segment_Copy_Number is equal to Corrected_Copy_Number
+    if (bin_table$Segment_Copy_Number[i] != bin_table$Corrected_Copy_Number[i]) {
+      counter <- 1
+      for (j in (i+1):nrow(cn_plotting)) {
+        if (bin_table$Segment_Copy_Number[j] != bin_table$Corrected_Copy_Number[j]) {
+          counter <- counter + 1
+        } else {
+          break
+        }
+      }
+      if (counter > threshold) {
+        for (j in i:(i+counter)) {
+          bin_table$Segment_Copy_Number[j] <- bin_table$Corrected_Copy_Number[j]
+        }
+      }
+    }
+  }
+  return(bin_table)
+}
