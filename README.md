@@ -18,7 +18,7 @@ There are a number of parameters to adjust in config/config.yaml.  Filepaths to 
 
 * TitanCNA repository : https://github.com/gavinha/TitanCNA
 
-* ichorCNA repository : https://github.com/GavinHaLab/ichorCNA
+* ichorCNA repository : [https://github.com/GavinHaLab/ichorCNA](https://github.com/GavinHaLab/ichorCNA/tree/v0.4.0)
 
 # Running the snakemake workflows on slurm cluster
 
