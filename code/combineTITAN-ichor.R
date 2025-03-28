@@ -62,6 +62,7 @@ libdir <- opt$libdir
 codedir <- opt$codedir
 outImageFile <- gsub(".seg.txt", ".RData", outSegFile)
 
+
 # Get the output path for the repaired PDF file, using the same directory as the Bin file output path
 if (rescueTITAN | nLOHPostProcess){
   outplot_repaired <- paste0(gsub("/[^/]*$", "", outBinFile), "/")
@@ -275,7 +276,7 @@ centromeres <- fread(centromere)
 # if TITAN_call is NLOH and clonal purity < cp_threshold
 # where cp_threshold is some user defined value after user observes low purity/minor subclone sample
 
-postProcessSegs <- function(segs, cn, cp_threshold = 0.5, normal_contam = NULL) {
+postProcessSegs <- function(segs, cn, cp_threshold = 1, normal_contam = NULL) {
   # error checking to make sure we have all the cols
   required_cols <- c("TITAN_call", "Cellular_Prevalence", "MinorCN", "MajorCN")
   missing_cols <- setdiff(required_cols, names(segs))
@@ -286,23 +287,19 @@ postProcessSegs <- function(segs, cn, cp_threshold = 0.5, normal_contam = NULL) 
   segs[, Corrected_MinorCN := as.numeric(Corrected_MinorCN)]
   segs[, Corrected_MajorCN := as.numeric(Corrected_MajorCN)]
   segs[, Cellular_Prevalence := as.numeric(Cellular_Prevalence)]
-  cn[, CellularPrevalence := as.numeric(CellularPrevalence)]
-  
+
   # calculating clonal purity
   # clonal purity = clone level prevalence * tumor fraction
   if (!is.null(normal_contam)) {
     clonalpurity_segs <- segs$Cellular_Prevalence * (1 - normal_contam)
-    clonalpurity_cn <- cn$CellularPrevalence * (1 - normal_contam)
   } else {
     clonalpurity_segs <- segs$Cellular_Prevalence
-    clonalpurity_cn <- cn$CellularPrevalence
   }
   
   # criteria
   idx_segs <- which(segs$TITAN_call == "NLOH" & clonalpurity_segs < cp_threshold)
-  idx_cn <- which(cn$TITANcall == "NLOH" & clonalpurity_cn < cp_threshold)
   
-  # for rows that meet the criteria
+  # for rows that meet the criteria 
   # change Corrected_Call to "NEUT" from "NLOH"
   # change MinorCN_post to 1 if it was 0 (otherwise leave it unchanged)
   if (length(idx_segs) > 0) {
@@ -310,16 +307,26 @@ postProcessSegs <- function(segs, cn, cp_threshold = 0.5, normal_contam = NULL) 
     segs[idx_segs, Corrected_MinorCN := ifelse(Corrected_MinorCN == 0, 1, Corrected_MinorCN)]
     segs[idx_segs, Corrected_MajorCN := ifelse(Corrected_MajorCN == 2, 1, Corrected_MajorCN)]
     
-  }
-  
-  # plotting function calls cn's TITANcall, so need to change that to HET instead of NLOH
-  if (length(idx_cn) > 0) {
-    cn[idx_cn, Corrected_Call := "NEUT"]
-    cn[idx_cn, TITANcall := "HET"]
+    # Making sure both segs and cn are changed in the regions they overlap
+    # Meaning, 
+    segs_to_correct <- segs[idx_segs, .(Chr = Chromosome, Start = as.integer(Start), End = as.integer(End))]
+    cn[, `:=`(Start = as.integer(Position), End = as.integer(Position))]
+    
+    cn <- cn[!is.na(Start) & !is.na(End)]
+    setkey(segs_to_correct, Chr, Start, End)
+    setkey(cn, Chr, Start, End)
+    
+    bins_to_correct <- foverlaps(cn, segs_to_correct, nomatch = 0)
+    
+    idx_cn_overlap <- bins_to_correct[, .I]
+    
+    # plotting function calls cn's TITANcall, so need to change that to HET instead of NLOH
+    cn[idx_cn_overlap, Corrected_Call := "NEUT"]
+    cn[idx_cn_overlap, TITANcall := "HET"]
     
   }
-  cn_NLOH <- cn[idx_cn, ]
-  #print(cn_NLOH)
+  
+
   return(list(segs = segs, cn = cn))
 }
 
