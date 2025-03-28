@@ -27,6 +27,8 @@ option_list <- list(
 	make_option(c("--ichorNormPanel"), type="character", default=NULL, help="Panel of normals; bin-level black list."),
 	make_option(c("--mergeIchorHOMD"), type="logical", default = FALSE, help="Merge ichorCNA HOMD segment into final combined segments."),
 	make_option(c("--isPDXorCellLine"), type="logical", default = FALSE, help="Insert TITAN missing hetSite data using corresponding bins from ichorCNA for specific samples"),
+  make_option(c("--nLOHPostProcess"), type="logical", default = FALSE, help="Enable nLOH (neutral loss of heterozygosity) processing. Default is FALSE."),
+  make_option(c("--cp_threshold"), type="double", default=0.5, help="Cellular prevalence threshold for NLOH post-processing. Default [%default]."),
 	make_option(c("--correctSegmentsInBins"), type="logical", default = FALSE, help="Correct segment copy number for consecutive bins that match in copy number but differ from segment copy number. Use only with --isPDXorCellLine"),
 	make_option(c("--sex"), type="character", default="female", help="female or male. Default [%default]."),
 	make_option(c("--libdir"), type="character", help="TitanCNA directory path to source R files if custom changes made."),
@@ -49,6 +51,8 @@ ichorParams <- opt$ichorParams
 ichorNormPanel <- opt$ichorNormPanel
 mergeIchorHOMD <- as.logical(opt$mergeIchorHOMD)
 rescueTITAN <- as.logical(opt$isPDXorCellLine)
+nLOHPostProcess <- as.logical(opt$nLOHPostProcess)
+cp_threshold <- opt$cp_threshold
 correctSegmentsInBins <- as.logical(opt$correctSegmentsInBins)
 gender <- opt$sex
 outSegFile <- opt$outSegFile
@@ -59,8 +63,8 @@ codedir <- opt$codedir
 outImageFile <- gsub(".seg.txt", ".RData", outSegFile)
 
 # Get the output path for the repaired PDF file, using the same directory as the Bin file output path
-if (rescueTITAN){
-	outplot_repaired <- paste0(gsub("/[^/]*$", "", outBinFile), "/")
+if (rescueTITAN | nLOHPostProcess){
+  outplot_repaired <- paste0(gsub("/[^/]*$", "", outBinFile), "/")
 }
 
 if (!is.null(libdir) && libdir != "None"){
@@ -266,6 +270,68 @@ if (rescueTITAN) {
 
 centromeres <- fread(centromere)
 
+# ================== post processing =========================
+# criteria:
+# if TITAN_call is NLOH and Cellular_Prevalence < cp_threshold
+# where cp_threshold is some user defined value after evaluating original cell prev (cp)
+
+postProcessSegs <- function(segs, cn, cp_threshold = 0.5, normal_contam = NULL) {
+  # error checking to make sure we have all the cols
+  required_cols <- c("TITAN_call", "Cellular_Prevalence", "MinorCN", "MajorCN")
+  missing_cols <- setdiff(required_cols, names(segs))
+  if (length(missing_cols) > 0) {
+    stop(paste("Missing required columns:", paste(missing_cols, collapse = ", ")))
+  }
+  
+  segs[, Cellular_Prevalence := as.numeric(Cellular_Prevalence)]
+  segs[, Corrected_MinorCN := as.numeric(Corrected_MinorCN)]
+  segs[, Corrected_MajorCN := as.numeric(Corrected_MajorCN)]
+  cn[, CellularPrevalence := as.numeric(CellularPrevalence)]
+  
+  # calculating clonal purity
+  if (!is.null(normal_contam)) {
+    clonalpurity_segs <- segs$Cellular_Prevalence * (1 - normal_contam)
+    clonalpurity_cn <- cn$CellularPrevalence * (1 - normal_contam)
+  } else {
+    clonalpurity_segs <- segs$Cellular_Prevalence
+    clonalpurity_cn <- cn$CellularPrevalence
+  }
+  
+  # criteria
+  idx_segs <- which(segs$TITAN_call == "NLOH" & clonalpurity_segs < cp_threshold)
+  idx_cn <- which(cn$TITANcall == "NLOH" & clonalpurity_cn < cp_threshold)
+  
+  # for rows that meet the criteria
+  # change Corrected_Call to "NEUT" from "NLOH"
+  # change MinorCN_post to 1 if it was 0 (otherwise leave it unchanged)
+  if (length(idx_segs) > 0) {
+    segs[idx_segs, Corrected_Call := "NEUT"]
+    segs[idx_segs, Corrected_MinorCN := ifelse(Corrected_MinorCN == 0, 1, Corrected_MinorCN)]
+    segs[idx_segs, Corrected_MajorCN := ifelse(Corrected_MajorCN == 2, 1, Corrected_MajorCN)]
+    
+  }
+  
+  # plotting function calls cn's TITANcall, so need to change that to HET instead of NLOH
+  if (length(idx_cn) > 0) {
+    cn[idx_cn, Corrected_Call := "NEUT"]
+    cn[idx_cn, TITANcall := "HET"]
+    
+  }
+  cn_NLOH <- cn[idx_cn, ]
+  #print(cn_NLOH)
+  return(list(segs = segs, cn = cn))
+}
+
+### if statement for user if they want to do post processing for NLOH or not
+#clonal purity instead
+# cp is percentage of cells out of all tumor cells
+if(nLOHPostProcess == TRUE){
+  normal_contam <- as.numeric(params$V2[params$V1 == "Normal contamination estimate:"])
+  result <- postProcessSegs(segs, cn, cp_threshold = cp_threshold, normal_contam = normal_contam)
+  segs <- result$segs
+  cn<- result$cn
+}
+
 #### For cases where sample is high-purity tumor ran in tumor-only mode ####
 if (rescueTITAN == TRUE) {
   ##################################### FIXING SEGS FILE OUTPUT #####################################
@@ -441,27 +507,73 @@ if (rescueTITAN == TRUE) {
   write.table(segs_plotting, file = paste0(outplot_repaired, id, ".TitanIchor.repaired-seg.segs.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
   
 } else {
-  segs_out <- extendSegments(segs, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
+  # segs$Start.snp.old <- segs$Start.snp
+  # segs$End.snp.old <- segs$End.snp
+  segs <- segs[, setdiff(names(segs), c("Start.snp", "End.snp")), with = FALSE]
+  segs <- extendSegments(segs, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
                              chrs = chrs, genomeStyle = genomeStyle)
-  cn_out <- copy(cn)
 }
 
 ## write segments to file ##
-write.table(segs_out, file = outSegFile, col.names=T, row.names=F, quote=F, sep="\t")
-write.table(cn_out, file = outBinFile, col.names=T, row.names=F, quote=F, sep="\t")
+write.table(segs, file = outSegFile, col.names=T, row.names=F, quote=F, sep="\t")
+write.table(cn, file = outBinFile, col.names=T, row.names=F, quote=F, sep="\t")
 ## write segments without germline SNPs
 outSegNoSNPFile <- gsub(".txt", ".noSNPs.txt", outSegFile)
-write.table(segs_out[, -c("Start.snp", "End.snp")], file = outSegNoSNPFile, col.names=T, row.names=F, quote=F, sep="\t")
+write.table(segs[, -c("Start.snp", "End.snp")], file = outSegNoSNPFile, col.names=T, row.names=F, quote=F, sep="\t")
 
 save.image(outImageFile)
 
 ## write segments in IGV / GISTIC format ##
-igv <- segs_out[, .(Sample, Chromosome, Start.snp, End.snp, Length.snp., logR_Copy_Number)]
+igv <- segs[, .(Sample, Chromosome, Start.snp, End.snp, Length.snp., logR_Copy_Number)]
 igv[Chromosome %in% chrs[1:22], Corrected.logR := log2(logR_Copy_Number / 2)]
 igv[Chromosome == chrs[grep("X", chrs)], Corrected.logR := log2(logR_Copy_Number / 1)]
 igv[, logR_Copy_Number := NULL]
 outIGVFile <- gsub("seg.txt", "segIGV.txt", outSegFile)
 write.table(igv, file = outIGVFile, col.names=T, row.names=F, quote=F, sep="\t")
 
+# ================ cnLOH Post Processing: Plotting GenomeWide CN & Allelic Ratio ===================
+
+print("Plotting...")
+yaxis <- "integer"
+colName <- "logR_Copy_Number"
+chrs_plot <- c(chrs, "chrX")
+
+outFile_pdf <- paste0(outplot_repaired, id, "TitanIchor_Repaired_GenomeWide_logRCN.pdf")
+outFile <- paste0(outplot_repaired, id, ".titan.ichor.loh.pdf")
+
+cn_plotting <- cn[ (which(!is.na(cn$Position) & !is.na(cn$logR_Copy_Number))),]
+cn_plotting <- cn_plotting[,c("Chr", "Position", "RefCount", "Depth", "AllelicRatio", "LogRatio", "CopyNumber", "TITANstate", "TITANcall", "ClonalCluster", "CellularPrevalence", "logR_Copy_Number", "Corrected_logR", "Corrected_Ratio", "Corrected_Copy_Number", "Corrected_Call")]
+cn_plotting$Chr <- factor(cn_plotting$Chr, levels = chrs)
+cn_plotting <- cn_plotting[order(cn_plotting$Chr), ]
+cn_plotting_dt <- as.data.table(cn_plotting)
 
 
+pdf(paste0(outFile_pdf),width=20,height=6)
+plotTitle <- paste0(id, "_TitanIchorCNA GenomeWide LogR-Copy-Number (Adjusted Segment CN Coloring)")
+plotTitanIchorCNA(as.data.frame(cn_plotting_dt), chr=chrs_plot, colName=colName, callColName="Corrected_Copy_Number", cytoBand=FALSE, purity=purity, ploidyT=ploidyT, yaxis=yaxis,
+                  cnCol=NULL, yrange=c(-2, 4), genomewide=TRUE, spacing=4, xaxt="n", cex=0.5, gene.cex=1.5, plot.title=plotTitle)
+dev.off()
+
+# Plot per chrs 
+plot_chromosomes <- function(results, chromosomes, output_prefix) {
+  lapply(chromosomes, function(chr) {
+    outFile_chrs <- paste0(output_prefix, chr, ".titan.ichor.loh.png")
+    
+    png(outFile_chrs, width=2000, height=600, res = 100)
+    plotAllelicRatio(dataIn = results, chr = chr, geneAnnot = NULL, spacing = 4,
+                     main = paste("Chromosome", chr), xlab = "", ylim=c(0, 1), cex = 0.5, cex.axis = 1.5,
+                     cex.lab = 1.5, cex.main = 1.5
+    )
+    
+    dev.off()
+  })
+}
+
+plot_chromosomes(cn_plotting_dt, chrs, paste0(outplot_repaired, id, "_"))
+
+# plot all chrs
+pdf(outFile,width=20,height=6)
+plotAllelicRatio(dataIn=cn_plotting_dt, chr=chrs, geneAnnot=NULL, spacing=4,
+                 main=id, xlab="", ylim=c(0, 1), cex=0.5, cex.axis=1.5,
+                 cex.lab=1.5, cex.main=1.5)
+dev.off()
