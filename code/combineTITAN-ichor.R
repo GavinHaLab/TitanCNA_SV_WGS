@@ -272,8 +272,8 @@ centromeres <- fread(centromere)
 
 # ================== post processing =========================
 # criteria:
-# if TITAN_call is NLOH and Cellular_Prevalence < cp_threshold
-# where cp_threshold is some user defined value after evaluating original cell prev (cp)
+# if TITAN_call is NLOH and clonal purity < cp_threshold
+# where cp_threshold is some user defined value after user observes low purity/minor subclone sample
 
 postProcessSegs <- function(segs, cn, cp_threshold = 0.5, normal_contam = NULL) {
   # error checking to make sure we have all the cols
@@ -283,12 +283,13 @@ postProcessSegs <- function(segs, cn, cp_threshold = 0.5, normal_contam = NULL) 
     stop(paste("Missing required columns:", paste(missing_cols, collapse = ", ")))
   }
   
-  segs[, Cellular_Prevalence := as.numeric(Cellular_Prevalence)]
   segs[, Corrected_MinorCN := as.numeric(Corrected_MinorCN)]
   segs[, Corrected_MajorCN := as.numeric(Corrected_MajorCN)]
+  segs[, Cellular_Prevalence := as.numeric(Cellular_Prevalence)]
   cn[, CellularPrevalence := as.numeric(CellularPrevalence)]
   
   # calculating clonal purity
+  # clonal purity = clone level prevalence * tumor fraction
   if (!is.null(normal_contam)) {
     clonalpurity_segs <- segs$Cellular_Prevalence * (1 - normal_contam)
     clonalpurity_cn <- cn$CellularPrevalence * (1 - normal_contam)
@@ -554,7 +555,7 @@ plotTitanIchorCNA(as.data.frame(cn_plotting_dt), chr=chrs_plot, colName=colName,
                   cnCol=NULL, yrange=c(-2, 4), genomewide=TRUE, spacing=4, xaxt="n", cex=0.5, gene.cex=1.5, plot.title=plotTitle)
 dev.off()
 
-# Plot per chrs 
+# Plot Allelic per chrs 
 plot_chromosomes <- function(results, chromosomes, output_prefix) {
   lapply(chromosomes, function(chr) {
     outFile_chrs <- paste0(output_prefix, chr, ".titan.ichor.loh.png")
@@ -562,9 +563,7 @@ plot_chromosomes <- function(results, chromosomes, output_prefix) {
     png(outFile_chrs, width=2000, height=600, res = 100)
     plotAllelicRatio(dataIn = results, chr = chr, geneAnnot = NULL, spacing = 4,
                      main = paste("Chromosome", chr), xlab = "", ylim=c(0, 1), cex = 0.5, cex.axis = 1.5,
-                     cex.lab = 1.5, cex.main = 1.5
-    )
-    
+                     cex.lab = 1.5, cex.main = 1.5)
     dev.off()
   })
 }
