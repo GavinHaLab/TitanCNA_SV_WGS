@@ -115,6 +115,8 @@ TitanCNA_numCores: 1
 ## Combine TitanCNA & ichorCNA
 mergeIchorHOMD: FALSE  # consider setting to TRUE when working with pure tumor
 isPDXorCellLine: FALSE # consider setting to TRUE when working with pure tumor
+nLOHPostProcess: FALSE # consider setting to TRUE when cnLOH present throughout whole genome and purity low
+cp_threshold: 0.5 # clonal purity threshold for cnLOH post processing, default 0.5
 correctSegmentsInBins: FALSE # consider setting to TRUE when working with isPDXorCellLine flag, or if you observe drastic differences between ichorCNA and titanCNA segmentation
 
 ## SVABA settings ##
