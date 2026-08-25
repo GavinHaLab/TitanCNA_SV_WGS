@@ -25,6 +25,7 @@ option_list <- list(
   make_option(c("--chrs"), type = "character", default = "c(1:22, 'X')", help = "Chromosomes to plot; string [Default: %default"),
   make_option(c("--start"), type = "integer", default = NULL, help = "Start coordinate for zoom plots"),
   make_option(c("--end"), type = "integer", default = NULL, help = "End coordinate for zoom plots"),
+  make_option(c("--units"), type = "character", default = "integer", help = "integer or logratio to plot for y-axis units. Default: [%default]"),
   make_option(c("--plotCNAtype"), type="character", default = "titan", help = "titan or ichor; if titan, then will also plot haplotype fraction. [Default: %default]."),
   make_option(c("--plotYlim"), type = "character", default = "c(-2,6)", help = "Y limits for plotting log ratio. [Default: %default]."),
   make_option(c("--plotSize"), type = "character", default = "c(8,4)", help = "width and height in inches. [Default: %default]."),
