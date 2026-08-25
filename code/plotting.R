@@ -141,7 +141,7 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
   subcloneCol <- c("#00FF00")
   if (is.null(cnCol) & (genomewide==FALSE)){
     cnCol <- c("#00FF00","#006400","#0000FF","#8B0000",rep("#FF0000", 26))
-    cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000")
+    cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000", "NEUT" = "#BEBEBE")
     names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
   } else if (is.null(cnCol) & (genomewide==TRUE) & ((callColName == "Segment_Copy_Number") | callColName == "Corrected_Copy_Number" | callColName == "Adjusted_Segment_Copy_Number")) {
     cnCol <- c("#00FF00", "#006400", "#0000FF", "#880000",rep("#FF0000", 26))
@@ -149,13 +149,13 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
     names(cnCol)[1:30] <- c(0,1,2,3,4,5,6:25)
   } else if (is.null(cnCol) & (genomewide == TRUE)) {
     cnCol <- c("#00FF00","#006400","#0000FF","#8B0000",rep("#FF0000", 26))
-    cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000")
+    cnCol <- c(cnCol, "HET"="#0000FF", "DLOH"="#006400", "NLOH"="#0000FF", "ALOH"="#FF0000", "ASCNA"="#FF0000", "BCNA"="#FF0000", "UBCNA"="#FF0000",  "NEUT" = "#BEBEBE")
     names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
-	} else {
-		cnCol.col <- as.character(cnCol[1])
-		cnCol <- c(cnCol, "HET"=cnCol.col, "DLOH"=cnCol.col, "NLOH"=cnCol.col, "ALOH"=cnCol.col, "ASCNA"=cnCol.col, "BCNA"=cnCol.col, "UBCNA"=cnCol.col)
-		names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
-	}
+  } else {
+    cnCol.col <- as.character(cnCol[1])
+    cnCol <- c(cnCol, "HET"=cnCol.col, "DLOH"=cnCol.col, "NLOH"=cnCol.col, "ALOH"=cnCol.col, "ASCNA"=cnCol.col, "BCNA"=cnCol.col, "UBCNA"=cnCol.col)
+    names(cnCol)[1:30] <- c("HOMD","HETD","NEUT","GAIN","AMP","HLAMP",paste0(rep("HLAMP", 8), 2:25))
+  }
   # adjust for ploidy #
   normCN <- 2
   if (!is.null(ploidyT) & yaxis != "integer"){
