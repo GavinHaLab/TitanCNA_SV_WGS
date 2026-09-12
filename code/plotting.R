@@ -179,7 +179,7 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
         y.ticks <- log2(cn)
         y.ticks[1] <- log2(zero)  
         yrange[1] <- y.ticks[1]    
-        ylab <- "Copy Number (logR)"
+        ylab <- "Copy Number"
         #dataByChr[, colName] <- log2(logRbasedCN(dataByChr[, colName], purity, ploidyT, cn=normCN))
         dataByChr[, colName] <- log2(dataByChr[, colName])
         if (colName != "LogRatio") {    ## Added conditional for this line
@@ -328,11 +328,11 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
 }
 
 ## compute copy number using corrected log ratio ##
-logRbasedCN <- function(x, purity, ploidyT, cn = 2){
-	ct <- (2^x * (cn * (1 - purity) + purity * ploidyT * (cn / 2)) - cn * (1 - purity)) / purity
-	ct <- sapply(ct, max, 1/2^6)
-	return(ct)
-}
+# logRbasedCN <- function(x, purity, ploidyT, cn = 2){
+# 	ct <- (2^x * (cn * (1 - purity) + purity * ploidyT * (cn / 2)) - cn * (1 - purity)) / purity
+# 	ct <- sapply(ct, max, 1/2^6)
+# 	return(ct)
+# }
 
 
 ## modified to work for combine_TITAN_ICHOR/titan_ichor_cn.txt
