@@ -30,12 +30,8 @@ rule all:
 		expand("results/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.titan.ichor.cna.txt", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]]),
 		"results/titan/hmm/optimalClusterSolution.txt",
 		"results/titan/hmm/optimalClusterSolution/",
-<<<<<<< HEAD
 		expand("results/CurationFiles/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.pdf", tumor=config["pairings"], clustNum=CLUST[config["TitanCNA_maxNumClonalClusters"]], ploidy=PLOIDY[config["TitanCNA_maxPloidy"]])
 
-=======
->>>>>>> origin/TitanIchor_changes
-		
 rule runTitanCNA:
 	priority: 10
 	input:
@@ -96,11 +92,7 @@ rule combineTitanAndIchorCNA:
 	log:
 		"logs/titan/hmm/titanCNA_ploidy{ploidy}/{tumor}_cluster{clustNum}.combineTitanIchorCNA.log"
 	shell:
-<<<<<<< HEAD
 		"Rscript {params.combineScript} --libdir {params.libdir} --codedir {params.codedir} --titanSeg {input.titanSeg} --titanBin {input.titanBin} --titanParam {input.titanParam} --ichorSeg {input.ichorSeg} --ichorBin {input.ichorBin} --ichorParam {input.ichorParam} --mergeIchorHOMD {params.mergeIchorHOMD} --isPDXorCellLine {params.isPDXorCellLine} --correctSegmentsInBins {params.correctSegmentsInBins} --sex {params.sex} --outSegFile {output.segFile} --outBinFile {output.binFile} --centromere {params.centromere} > {log} 2> {log}"
-=======
-		"Rscript {params.combineScript} --libdir {params.libdir} --titanSeg {input.titanSeg} --titanBin {input.titanBin} --titanParam {input.titanParam} --ichorSeg {input.ichorSeg} --ichorBin {input.ichorBin} --ichorParam {input.ichorParam} --mergeIchorHOMD {params.mergeIchorHOMD} --isPDXorCellLine {params.isPDXorCellLine} --correctSegmentsInBins {params.correctSegmentsInBins} --sex {params.sex} --outSegFile {output.segFile} --outBinFile {output.binFile} --centromere {params.centromere} > {log} 2> {log}"	
->>>>>>> origin/TitanIchor_changes
 	
 rule selectSolution:
 	priority: 2

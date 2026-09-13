@@ -1,21 +1,21 @@
 ## path to tools
-samTools:  /path/to/samtools
-bcfTools:  /path/to/bcftools
-svaba_exe:  /path/to/svaba
+samTools:  /opt/homebrew/bin/samtools
+bcfTools:  /opt/homebrew/bin/bcftools
+svaba_exe:  /Users/pchandra/Desktop/plot_issue/test_v2/tools/svaba/build/svaba
 
 ## path to scripts ##
-readCounterScript:  /path/to/readCounter
-ichorCNA_rscript:  /path/to/ichorCNA/scripts/runIchorCNA.R
+readCounterScript:  /Users/pchandra/Desktop/plot_issue/test_v2/tools/hmmcopy_utils/build/bin/readCounter
+ichorCNA_rscript:  /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/scripts/runIchorCNA.R
 pyCountScript:  code/countPysam.py
-TitanCNA_rscript: /path/to/TitanCNA/scripts/R_scripts/titanCNA.R
+TitanCNA_rscript: /Users/pchandra/Desktop/plot_issue/updated/TitanCNA/scripts/R_scripts/titanCNA.R
 TitanCNA_combineTitanIchorCNA:  code/combineTITAN-ichor.R
-TitanCNA_selectSolutionRscript: /path/to/TitanCNA/scripts/R_scripts/selectSolution.R
+TitanCNA_selectSolutionRscript: /Users/pchandra/Desktop/plot_issue/updated/TitanCNA/scripts/R_scripts/selectSolution.R
 
 # include if ichorCNA/TitanCNA R source if files changed but package has not been installed within R
-TitanCNA_libdir:  /src/TitanCNA   # set currently to current directory's src due to changes in utils.R and plotting.R
-ichorCNA_libdir:  /path/to/ichorCNA 
+TitanCNA_libdir:  /Users/pchandra/Desktop/plot_issue/updated/TitanCNA/
+ichorCNA_libdir:  /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/ 
 
-reference_genome: /path/to/genome.fa
+reference_genome: /Users/pchandra/Desktop/plot_issue/test_v2/Homo_sapiens_assembly38.fasta
 
 ## path to scripts ##
 svaba_funcs:  code/svaba_utils.R
@@ -29,10 +29,10 @@ TitanCNA_curation_script: code/runCurationFiles_for_titanCNA.py
 ## reference settings and paths to reference files ##
 genomeBuild: hg38
 genomeStyle: UCSC
-refFasta:  /path/to/fasta/genome.fa
-snpVCF:  /path/to/hapmap_3.3.hg38.vcf.gz
-cytobandFile:  /path/to/ichorCNA/inst/extdata/cytoBand_hg38.txt # only need if hg38
-centromere:  /path/to/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
+refFasta:  /Users/pchandra/Desktop/plot_issue/test_v2/Homo_sapiens_assembly38.fasta
+snpVCF:  /Users/pchandra/Desktop/plot_issue/test_v2/hapmap_3.3.hg38.vcf.gz
+cytobandFile:  /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/inst/extdata/cytoBand_hg38.txt # only need if hg38
+centromere:  /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
 sex:  male   # use None if both females and males are in sample set
 
 ## params for each step ##
@@ -54,12 +54,12 @@ vcf_quality:  100
 # ichorCNA_normalPanel: /path/to/ichorCNA/inst/extdata/HD_ULP_PoN_hg38_1Mb_median_normAutosome_median.rds
 ichorCNA_exons: NULL
 # must use gc wig file corresponding to same binSize (required)
-ichorCNA_gcWig: /path/to/ichorCNA/inst/extdata/gc_hg38_10kb.wig
+ichorCNA_gcWig: /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/inst/extdata/gc_hg38_10kb.wig
 # must use map wig file corresponding to same binSize (required)
-ichorCNA_mapWig:  /path/to/ichorCNA/inst/extdata/map_hg38_10kb.wig
+ichorCNA_mapWig:  /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/inst/extdata/map_hg38_10kb.wig
 # use bed file if sample has targeted regions, eg. exome data (optional)
-ichorCNA_repTimeWig: /path/to/ichorCNA/inst/extdata/RepTiming_hg38_10kb.wig
-ichorCNA_centromere:  /path/to/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
+ichorCNA_repTimeWig: /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/inst/extdata/RepTiming_hg38_10kb.wig
+ichorCNA_centromere:  /Users/pchandra/Desktop/plot_issue/updated/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
 
 ichorCNA_chrs:  paste0('chr', c(1:22, \"X\"))
 
