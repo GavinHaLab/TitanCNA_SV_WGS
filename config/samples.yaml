@@ -1,7 +1,7 @@
 samples: #format is sample_name: /path/to/sample.bam for both tumors and normals
-  20-008-downsample-T:  /Users/pchandra/Desktop/plot_issue/updated/PCTAN_downsampled_test/20-008-downsample-T_tumor.bam
-  20-008-downsample-N:  /Users/pchandra/Desktop/plot_issue/updated/PCTAN_downsampled_test/20-008-downsample-N_normal.bam
+  01-006-T:  /path/to/01-006-T_tumor.bam
+  01-006-N:  /path/to/01-006-N_normal.bam
 
 
 pairings: #format is tumor: matched_normal
-  20-008-downsample-T: 20-008-downsample-N
+  01-006-T: 01-006-N
