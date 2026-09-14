@@ -54,7 +54,7 @@ def run_curation_compilation(input_path, output_path):
     # os.chdir(input_path)
     # os.system(command1)
     with new_cd(input_path):
-        command="convert *_CNA.png *_LOH.png *chr1.png *chr2.png *chr3.png *chr4.png *chr5.png *chr6.png *chr7.png *chr8.png *chr9.png *chr10.png *chr11.png *chr12.png *chr13.png *chr14.png *chr15.png *chr16.png *chr17.png *chr18.png *chr19.png *chr20.png *chr21.png *chr22.png -quality 100 " + output_path
+        command="convert *_CNA.png *_LOH.png *chr1.png *chr2.png *chr3.png *chr4.png *chr5.png *chr6.png *chr7.png *chr8.png *chr9.png *chr10.png *chr11.png *chr12.png *chr13.png *chr14.png *chr15.png *chr16.png *chr17.png *chr18.png *chr19.png *chr20.png *chr21.png *chr22.png *chrX.png *TitanIchor_Repaired_GenomeWide_logRCN.png *CNA_all_chrs.png -quality 100 " + output_path
         os.system(command)
     # subprocess.run(command2, cwd=input_path)
     return 0;

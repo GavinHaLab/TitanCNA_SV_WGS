@@ -58,10 +58,16 @@ libdir <- opt$libdir
 codedir <- opt$codedir
 outImageFile <- gsub(".seg.txt", ".RData", outSegFile)
 
-# Get the output path for the repaired PDF file, using the same directory as the Bin file output path
-if (rescueTITAN){
-	outplot_repaired <- paste0(gsub("/[^/]*$", "", outBinFile), "/")
+# Get the output path for the repaired PDF file: the same per-cluster subfolder titanCNA.R writes its own plots into
+clustNumStr <- regmatches(outBinFile, regexpr("(?<=_cluster)[0-9]+", outBinFile, perl=TRUE))
+if (as.numeric(clustNumStr) < 10){
+	clustNumStr <- paste0("0", clustNumStr)
 }
+outplot_repaired <- paste0(gsub("\\.titan\\.ichor\\.cna\\.txt$", "", outBinFile), "/")
+
+## ensure output directories exist (already true in the Snakemake pipeline; needed for manual/ad-hoc runs)
+dir.create(dirname(outSegFile), recursive = TRUE, showWarnings = FALSE)
+dir.create(outplot_repaired, recursive = TRUE, showWarnings = FALSE)
 
 if (!is.null(libdir) && libdir != "None"){
   source(paste0(libdir, "/R/utils.R"))
@@ -314,88 +320,96 @@ if (rescueTITAN == TRUE) {
   segs2 <- extendSegments(titan_subset_filtered, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
                           chrs = chrs, genomeStyle = genomeStyle)
   
-  segs_plotting <- copy(segs2)
-  setnames(segs_plotting, c("Start", "End"), c("Start_Position.bp.", "End_Position.bp."))
-  
-  ########## Process cn_plotting ##########
-  cn_plotting <- cn2[ (which(!is.na(cn2$Position) & !is.na(cn2$logR_Copy_Number))),]
-  cn_plotting <- cn_plotting[,c("Chr", "Position", "RefCount", "Depth", "AllelicRatio", "LogRatio", "CopyNumber", "TITANstate", "TITANcall", "ClonalCluster", "CellularPrevalence", "logR_Copy_Number", "Corrected_logR", "Corrected_Ratio", "Corrected_Copy_Number", "Corrected_Call")]
-  cn_plotting$Chr <- factor(cn_plotting$Chr, levels = chrs)
-  cn_plotting <- cn_plotting[order(cn_plotting$Chr), ]
+  cn_out <- copy(cn2)
+  segs_out <- copy(segs2)
 
-  ########## Process segment-based copy number ##########
-  ## Create a new column for segment-based copy number in the cn_plotting category
-  seg_copy_numbers <- numeric(length = nrow(cn_plotting))
-  print("...processing segment_based copy")
-  for (i in 1:nrow(cn_plotting)) {
-    # Check if POSITION falls between START and END in table 2
-    matched_row <- which(cn_plotting$Chr[i] == segs_plotting$Chromosome & cn_plotting$Position[i] >= segs_plotting$Start_Position.bp. & cn_plotting$Position[i] <= segs_plotting$End_Position.bp.)
-    # If a match is found, extract the copy number
-    if (length(matched_row) > 0) {
-      seg_copy_numbers[i] <- segs_plotting$Corrected_Copy_Number[matched_row]
-    } else {
-      seg_copy_numbers[i] <- cn_plotting$Corrected_Copy_Number[i]  # If no match found, store Corrected_Copy_Number
-    }
-    if (cn_plotting$Chr[i] == "chrX") {
-      cn_plotting$Corrected_Copy_Number[i] <- seg_copy_numbers[i]
-    }
+} else {
+  segs_out <- extendSegments(segs, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
+                             chrs = chrs, genomeStyle = genomeStyle)
+  cn_out <- copy(cn)
+}
+
+########## Build plotting objects (chrX-inclusive genome-wide plot; generated regardless of isPDXorCellLine) ##########
+segs_plotting <- copy(segs_out)
+setnames(segs_plotting, c("Start", "End"), c("Start_Position.bp.", "End_Position.bp."))
+
+########## Process cn_plotting ##########
+cn_plotting <- cn_out[ (which(!is.na(cn_out$Position) & !is.na(cn_out$logR_Copy_Number))),]
+cn_plotting <- cn_plotting[,c("Chr", "Position", "RefCount", "Depth", "AllelicRatio", "LogRatio", "CopyNumber", "TITANstate", "TITANcall", "ClonalCluster", "CellularPrevalence", "logR_Copy_Number", "Corrected_logR", "Corrected_Ratio", "Corrected_Copy_Number", "Corrected_Call")]
+cn_plotting$Chr <- factor(cn_plotting$Chr, levels = chrs)
+cn_plotting <- cn_plotting[order(cn_plotting$Chr), ]
+
+########## Process segment-based copy number ##########
+## Create a new column for segment-based copy number in the cn_plotting category
+seg_copy_numbers <- numeric(length = nrow(cn_plotting))
+print("...processing segment_based copy")
+for (i in 1:nrow(cn_plotting)) {
+  # Check if POSITION falls between START and END in table 2
+  matched_row <- which(cn_plotting$Chr[i] == segs_plotting$Chromosome & cn_plotting$Position[i] >= segs_plotting$Start_Position.bp. & cn_plotting$Position[i] <= segs_plotting$End_Position.bp.)
+  # If a match is found, extract the copy number
+  if (length(matched_row) > 0) {
+    seg_copy_numbers[i] <- segs_plotting$Corrected_Copy_Number[matched_row]
+  } else {
+    seg_copy_numbers[i] <- cn_plotting$Corrected_Copy_Number[i]  # If no match found, store Corrected_Copy_Number
   }
-  ## Assign segment copy numbers to the cn_plotting table
-  cn_plotting$Segment_Copy_Number <- seg_copy_numbers
-  
-  # Optional fine-tuning: if multiple bins have a shared copy number that also differs from Segment_Copy_Number, replace Segment_Copy_Number with the shared copy number
-  # Threshold represents the minimum number of bins that have to share copy number to be considered
-  if (correctSegmentsInBins) {
+  if (cn_plotting$Chr[i] == "chrX") {
+    cn_plotting$Corrected_Copy_Number[i] <- seg_copy_numbers[i]
+  }
+}
+## Assign segment copy numbers to the cn_plotting table
+cn_plotting$Segment_Copy_Number <- seg_copy_numbers
+
+# Optional fine-tuning: if multiple bins have a shared copy number that also differs from Segment_Copy_Number, replace Segment_Copy_Number with the shared copy number
+# Threshold represents the minimum number of bins that have to share copy number to be considered
+if (correctSegmentsInBins) {
 	corCN_col = "Corrected_Copy_Number"
 	segCN_col = "Segment_Copy_Number"
 	cn_plotting <- correct_segCN_bins(cn_plotting, CorrectedCN_Col=corCN_col, SegCN_Col=segCN_col, threshold=50)
-  }
-  
-  ########## Plotting repaired Titan-Ichor Genome-Wide Plots ##########
-  print("...loading plotting parameters")
-  
-  chrs_plot <- c(chrs, "chrX")
-  
-  ## Plotting Titan-Ichor Repaired File
-  cn_plotting_dt <- as.data.table(cn_plotting)
-  
-  
-  ## Invoke plotting parameters and function
-  ("...preparing to plot")
+}
+
+########## Plotting repaired Titan-Ichor Genome-Wide Plots ##########
+print("...loading plotting parameters")
+
+## Plotting Titan-Ichor Repaired File
+cn_plotting_dt <- as.data.table(cn_plotting)
+
+
+## Invoke plotting parameters and function
+("...preparing to plot")
 #   normCN <- 2
-  yaxis <- "integer"
-  ylim <- c(-2, 4)
+yaxis <- "integer"
+ylim <- c(-2, 4)
 #   ploidyS <- purity * ploidyT + (1-purity) * normCN
 #   ploidyX <- purity * ploidyT/2 + (1 - purity) * normCN
-  if (yaxis == "integer"){
-    cn_plotting_dt[!grepl("X",Chr), logR_Copy_Number := (logRbasedCN(LogRatio, purity, ploidyT, cn=2))]
-    cn_plotting_dt[grepl("X",Chr), logR_Copy_Number := (logRbasedCN(LogRatio, purity, ploidyT, cn=1))]
-    cn_plotting_dt[, Corrected_Copy_Number := round(logR_Copy_Number)]
-    
-    # Correct Corrected_Copy_Number values without Cellular_Prevalence using logRbasedCN within both titan_ichor_merged and titan_ichor_new_method
-    # Create a new column in titan_ichor_merged called "Adjusted_Copy_Number" that uses logRbasedCN to correct the Copy_Number values
-    segs_plotting[!grepl("X", Chromosome), Adjusted_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=2))]
-    segs_plotting[grepl("X", Chromosome), Adjusted_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=1))]
-    
-    adj_copy_numbers <- numeric(length = nrow(cn_plotting_dt))
-    
-    for (i in 1:nrow(cn_plotting_dt)) {
-      # Check if POSITION falls between START and END in table 2
-      matched_row <- which(cn_plotting_dt$Chr[i] == segs_plotting$Chromosome & cn_plotting_dt$Position[i] >= segs_plotting$Start_Position.bp. & cn_plotting_dt$Position[i] <= segs_plotting$End_Position.bp.)
-      # If a match is found, extract the copy number
-      if (length(matched_row) > 0) {
-        adj_copy_numbers[i] <- segs_plotting$Adjusted_Copy_Number[matched_row]
-      } else {
-        adj_copy_numbers[i] <- cn_plotting_dt$Corrected_Copy_Number[i]  # If no match found, store NA
-        # adj_copy_numbers[i] <- NA
-      }
-      if (cn_plotting_dt$Chr[i] == "chrX") {
-        cn_plotting_dt$Corrected_Copy_Number[i] <- adj_copy_numbers[i]
-      }
-    }
-    cn_plotting_dt$Adjusted_Segment_Copy_Number <- adj_copy_numbers
+if (yaxis == "integer"){
+  cn_plotting_dt[!grepl("X",Chr), logR_Copy_Number := (logRbasedCN(LogRatio, purity, ploidyT, cn=2))]
+  cn_plotting_dt[grepl("X",Chr), logR_Copy_Number := (logRbasedCN(LogRatio, purity, ploidyT, cn=1))]
+  cn_plotting_dt[, Corrected_Copy_Number := round(logR_Copy_Number)]
 
-    ### Adjust segment copy numbers again to account for new calculation without CP + generate new "segments" based on CN copy number distribution
+  # Correct Corrected_Copy_Number values without Cellular_Prevalence using logRbasedCN within both titan_ichor_merged and titan_ichor_new_method
+  # Create a new column in titan_ichor_merged called "Adjusted_Copy_Number" that uses logRbasedCN to correct the Copy_Number values
+  segs_plotting[!grepl("X", Chromosome), Adjusted_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=2))]
+  segs_plotting[grepl("X", Chromosome), Adjusted_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=1))]
+
+  adj_copy_numbers <- numeric(length = nrow(cn_plotting_dt))
+
+  for (i in 1:nrow(cn_plotting_dt)) {
+    # Check if POSITION falls between START and END in table 2
+    matched_row <- which(cn_plotting_dt$Chr[i] == segs_plotting$Chromosome & cn_plotting_dt$Position[i] >= segs_plotting$Start_Position.bp. & cn_plotting_dt$Position[i] <= segs_plotting$End_Position.bp.)
+    # If a match is found, extract the copy number
+    if (length(matched_row) > 0) {
+      adj_copy_numbers[i] <- segs_plotting$Adjusted_Copy_Number[matched_row]
+    } else {
+      adj_copy_numbers[i] <- cn_plotting_dt$Corrected_Copy_Number[i]  # If no match found, store NA
+      # adj_copy_numbers[i] <- NA
+    }
+    if (cn_plotting_dt$Chr[i] == "chrX") {
+      cn_plotting_dt$Corrected_Copy_Number[i] <- adj_copy_numbers[i]
+    }
+  }
+  cn_plotting_dt$Adjusted_Segment_Copy_Number <- adj_copy_numbers
+
+  ### Adjust segment copy numbers again to account for new calculation without CP + generate new "segments" based on CN copy number distribution
 	if (correctSegmentsInBins) {
 		cn_plotting_dt2 <- copy(cn_plotting_dt)
 
@@ -417,34 +431,82 @@ if (rescueTITAN == TRUE) {
 			}
 		}
 	}
-    colName <- "logR_Copy_Number"
-  }else{
-    cn_plotting_dt[!grepl("X",Chr), LogRatio := LogRatio + log2(ploidyS / 2)]
-    cn_plotting_dt[grepl("X", Chr), LogRatio := LogRatio + log2(ploidyX / 2)]
-    segs_plotting$LogRatio <- segs_plotting$Median_logR
-    segs_plotting$LogRatio <- segs_plotting$LogRatio + log2(ploidyS / 2)
-    colName <- "LogRatio"
-  }
-  
-  print("Plotting...")
-  outFile_pdf <- paste0(outplot_repaired, id, "_TitanIchor_Repaired_GenomeWide_logRCN.pdf")
-  pdf(paste0(outFile_pdf),width=20,height=6)
-  plotTitle <- paste0(id, "_TitanIchorCNA GenomeWide LogR-Copy-Number (Adjusted Segment CN Coloring)")
-  plotTitanIchorCNA(as.data.frame(cn_plotting_dt), chr=chrs_plot, colName=colName, callColName="Adjusted_Segment_Copy_Number", cytoBand=FALSE, purity=purity, ploidyT=ploidyT, yaxis=yaxis,
-                    cnCol=NULL, yrange=ylim, genomewide=TRUE, spacing=4, xaxt="n", cex=0.5, gene.cex=1.5, plot.title=plotTitle)
-  dev.off()
-  
-  cn_out <- copy(cn2)
-  segs_out <- copy(segs2)
-  
-  write.table(cn_plotting_dt, file = paste0(outplot_repaired, id, ".TitanIchor.repaired-seg.cna.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
-  write.table(segs_plotting, file = paste0(outplot_repaired, id, ".TitanIchor.repaired-seg.segs.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
-  
-} else {
-  segs_out <- extendSegments(segs, removeCentromeres = TRUE, centromeres = centromeres, extendToTelomeres = FALSE,
-                             chrs = chrs, genomeStyle = genomeStyle)
-  cn_out <- copy(cn)
+  colName <- "logR_Copy_Number"
+}else{
+  cn_plotting_dt[!grepl("X",Chr), LogRatio := LogRatio + log2(ploidyS / 2)]
+  cn_plotting_dt[grepl("X", Chr), LogRatio := LogRatio + log2(ploidyX / 2)]
+  segs_plotting$LogRatio <- segs_plotting$Median_logR
+  segs_plotting$LogRatio <- segs_plotting$LogRatio + log2(ploidyS / 2)
+  colName <- "LogRatio"
 }
+
+print("Plotting...")
+titlePurityPloidy <- sprintf(" (purity=%.2f, ploidy=%.2f)", purity, ploidyT)
+outFile_pdf <- paste0(outplot_repaired, id, "_cluster", clustNumStr, "_TitanIchor_Repaired_GenomeWide_logRCN.pdf")
+pdf(paste0(outFile_pdf),width=20,height=6)
+plotTitle <- paste0(id, "_TitanIchorCNA GenomeWide LogR-Copy-Number (Adjusted Segment CN Coloring)", titlePurityPloidy)
+plotTitanIchorCNA(as.data.frame(cn_plotting_dt), chr=chrs, colName=colName, callColName="Adjusted_Segment_Copy_Number", cytoBand=FALSE, purity=purity, ploidyT=ploidyT, yaxis=yaxis,
+                  cnCol=NULL, yrange=ylim, genomewide=TRUE, spacing=4, xaxt="n", cex=0.5, gene.cex=1.5, plot.title=plotTitle)
+dev.off()
+
+## Genome-wide "Copy Number (log ratio)" plot, chrX-inclusive
+ichor.cn.chrX <- copy(ichor.cn[Chr == chrs[grep("X", chrs)]])
+setnames(ichor.cn.chrX, c(paste0(id, ".Corrected_Copy_Number"), paste0(id, ".Corrected_Call")), c("Corrected_Copy_Number", "Corrected_Call"))
+## recompute chrX's color from TitanCNA's own ploidy (cn=1 reference for males since chrX is hemizygous;
+## cn=2 for females since female chrX is diploid like autosomes), matching how its position is now TitanCNA-adjusted too.
+## male chrX's cn=1-based value is always half of the equivalent autosome (cn=2) value at the same logR, so it
+## must be doubled (not shifted by a fixed constant) to land on autosomes' own color scale for any ploidyT
+if (gender == "male"){
+	ichor.cn.chrX[, Corrected_Copy_Number := round(logRbasedCN(LogRatio, purity, ploidyT, cn=1) * 2)]
+}else{
+	ichor.cn.chrX[, Corrected_Copy_Number := round(logRbasedCN(LogRatio, purity, ploidyT, cn=2))]
+}
+cn_for_logratio_plot <- rbind(titan.cn[Chr %in% chrs[1:22]], ichor.cn.chrX, fill = TRUE)
+cn_for_logratio_plot <- cn_for_logratio_plot[!is.na(Position) & !is.na(LogRatio)]
+
+## segment median lines are colored from segs_plotting's own Corrected_Copy_Number, which for chrX is a
+## different, older value than what the dots above now use; recompute it the same way on a copy so the line
+## matches its own dot cloud (done on a copy so it doesn't affect the _chrX.pdf plot or the .plotting.txt output)
+segs_plotting_color <- copy(segs_plotting)
+if (gender == "male"){
+	segs_plotting_color[Chromosome == chrs[grep("X", chrs)], Corrected_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=1) * 2)]
+}else{
+	segs_plotting_color[Chromosome == chrs[grep("X", chrs)], Corrected_Copy_Number := round(logRbasedCN(Median_logR, purity, ploidyT, cn=2))]
+}
+
+cexVec <- rep(0.5, nrow(cn_for_logratio_plot))
+cexVec[cn_for_logratio_plot$Chr == chrs[grep("X", chrs)]] <- 0.15
+
+## xlim/width computed so autosomes render at the same bp-per-inch as titanCNA.R's own _CNA.pdf
+chrSpans <- cn_for_logratio_plot[, .(span = max(Position) - min(Position)), by = Chr]
+totalSpanAutosomes <- sum(chrSpans[Chr %in% chrs[1:22], span])
+totalSpanChrX <- chrSpans[Chr == chrs[grep("X", chrs)], span]
+chr1Start <- min(cn_for_logratio_plot[Chr == "chr1", Position])
+autosomeXlim <- extendrange(c(chr1Start, chr1Start + totalSpanAutosomes))
+xlim_logratio <- c(autosomeXlim[1], autosomeXlim[2] + totalSpanChrX)
+outWidth_logratio <- 20 * (diff(xlim_logratio) / diff(autosomeXlim))
+
+ylim_logratio <- c(-2, 4)
+
+outFile_pdf_logratio <- paste0(outplot_repaired, id, "_cluster", clustNumStr, "_CNA_all_chrs.pdf")
+pdf(outFile_pdf_logratio, width=outWidth_logratio, height=6)
+plotCNlogRByChr(dataIn=cn_for_logratio_plot, chr=chrs, segs=segs_plotting_color, ploidy=ploidyT,
+                normal=1-purity, geneAnnot=NULL, spacing=4, main=paste0(id, titlePurityPloidy), xlab="", cex=cexVec, ylim=ylim_logratio, xlim=xlim_logratio,
+                cex.axis=1.5, cex.lab=1.5, cex.main=1.5)
+dev.off()
+
+## Per-chromosome chrX plot; written as PDF since png() needs an X11 display this system doesn't have
+outFile_chrX <- paste0(outplot_repaired, id, "_cluster", clustNumStr, "_chrX.pdf")
+pdf(outFile_chrX, width=12, height=8)
+par(mfrow=c(2,1))
+plotCNlogRByChr(dataIn=ichor.cn.chrX, chr=chrs[grep("X", chrs)], segs=segs_plotting_color, ploidy=ploidy,
+                normal=1-purity, geneAnnot=NULL, cex.axis=1.5, ylim=ylim_logratio, cex=0.3, xlab="", main="Chr X")
+plotSegmentMedians(segs_plotting_color, chr=chrs[grep("X", chrs)], resultType="LogRatio", plotType="CopyNumber",
+                   plot.new=TRUE, xlab="", spacing=4, main="Chr X")
+dev.off()
+
+write.table(cn_plotting_dt, file = paste0(dirname(outSegFile), "/", id, "_cluster", clustNumStr, ".TitanIchor.repaired-seg.cna.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
+write.table(segs_plotting, file = paste0(dirname(outSegFile), "/", id, "_cluster", clustNumStr, ".TitanIchor.repaired-seg.segs.plotting.txt"), col.names=T, row.names=F, quote=F, sep="\t")
 
 ## write segments to file ##
 write.table(segs_out, file = outSegFile, col.names=T, row.names=F, quote=F, sep="\t")

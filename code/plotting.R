@@ -328,11 +328,11 @@ plotTitanIchorCNA <- function(dataIn, param = NULL, colName = "LogRatio", callCo
 }
 
 ## compute copy number using corrected log ratio ##
-logRbasedCN <- function(x, purity, ploidyT, cn = 2){
-	ct <- (2^x * (cn * (1 - purity) + purity * ploidyT * (cn / 2)) - cn * (1 - purity)) / purity
-	ct <- sapply(ct, max, 1/2^6)
-	return(ct)
-}
+# logRbasedCN <- function(x, purity, ploidyT, cn = 2){
+# 	ct <- (2^x * (cn * (1 - purity) + purity * ploidyT * (cn / 2)) - cn * (1 - purity)) / purity
+# 	ct <- sapply(ct, max, 1/2^6)
+# 	return(ct)
+# }
 
 
 ## modified to work for combine_TITAN_ICHOR/titan_ichor_cn.txt
