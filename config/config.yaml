@@ -12,7 +12,7 @@ TitanCNA_combineTitanIchorCNA:  code/combineTITAN-ichor.R
 TitanCNA_selectSolutionRscript: /path/to/TitanCNA/scripts/R_scripts/selectSolution.R
 
 # include if ichorCNA/TitanCNA R source if files changed but package has not been installed within R
-TitanCNA_libdir:  /path/to/TitanCNA  
+TitanCNA_libdir:  /path/to/TitanCNA
 ichorCNA_libdir:  /path/to/ichorCNA 
 
 reference_genome: /path/to/genome.fa
@@ -109,6 +109,7 @@ TitanCNA_alphaK:  10000
 TitanCNA_alphaR:  10000
 TitanCNA_txnExpLen: 1e15
 TitanCNA_plotYlim:  c(-2,4)
+TitanCNA_plotCorrectedCN:  TRUE
 TitanCNA_solutionThreshold: 0.05
 TitanCNA_numCores: 1
 

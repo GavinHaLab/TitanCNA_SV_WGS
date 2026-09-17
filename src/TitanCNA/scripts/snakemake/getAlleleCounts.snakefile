@@ -26,7 +26,7 @@ rule getHETsites:
 	log:
 		"logs/titan/hetPosns/{tumor}/{tumor}.chr{chr}.log"
 	shell:
-		"{params.bcftoolsCmd} mpileup -Ov -I -f {params.refFasta} -r {wildcards.chr} -T {params.snpDB} {input} | {params.bcftoolsCmd} call -v -c - | grep -e '0/1' -e '#' > {output} 2> {log}"
+		"{params.samtoolsCmd} mpileup -uv -I -f {params.refFasta} -r {wildcards.chr} -l {params.snpDB} {input} | {params.bcftoolsCmd} call -v -c - | grep -e '0/1' -e '#' > {output} 2> {log}"
 
 
 rule getAlleleCountsByChr:
